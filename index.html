@@ -57,7 +57,7 @@ main{max-width:1500px;margin:0 auto;padding:32px 24px}
 .page-subtitle{font-size:.9rem;color:var(--text-soft)}
 
 /* STATS */
-.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px}
 .stat-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px 22px;border-top:4px solid var(--kth-blue);box-shadow:var(--shadow-sm)}
 .stat-card.coral{border-top-color:var(--kth-coral)}
 .stat-card.warn{border-top-color:var(--warn)}
@@ -299,6 +299,9 @@ main{max-width:1500px;margin:0 auto;padding:32px 24px}
 <div class="toast" id="toast"></div>
 
 <script>
+// ── SYNC-ENDPOINT (GAS Web App URL — nach Deployment hier eintragen) ─────────
+const GAS_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxwvd47YlWn4L8VTeOgQ3Wq_yfypSFMwtrHn-SccPnvWNTjIYftZbKg39EzWpKpMIGn/exec';
+
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 const PW='kaTha14612';
 function checkPw(){
@@ -400,14 +403,26 @@ function updateTuevHints(){
     +items.map(s=>`<button type="button" class="hint-btn${s.first?' hint-first':''}" onclick="document.getElementById('f_tuev').value='${s.val}'">${s.lbl}</button>`).join('');
 }
 
+// ── SYNC ZU GAS ───────────────────────────────────────────────────────────────
+function syncTermine(){
+  if(!GAS_SYNC_URL) return;
+  const termine=data.map(v=>({
+    kennzeichen:v.kennzeichen,
+    marke:v.marke,
+    modell:v.modell,
+    naechsterTuev:v.naechsterTuev||'',
+    naechsteWerkstatt:v.naechsteWerkstatt||''
+  }));
+  fetch(GAS_SYNC_URL,{method:'POST',body:JSON.stringify(termine),mode:'no-cors'})
+    .catch(()=>{});
+}
+
 // ── STATS ─────────────────────────────────────────────────────────────────────
 function stats(){
   const total=data.length;
   const tuev=data.filter(v=>{const d=daysTo(v.naechsterTuev);return d!==null&&d<=90;}).length;
   const wrk=data.filter(v=>{const d=daysTo(v.naechsteWerkstatt);return d!==null&&d<=60;}).length;
-  const ago7=new Date(Date.now()-7*86400000).toISOString().slice(0,10);
-  const clean=data.filter(v=>(v.reinigungen||[]).some(r=>r.datum>=ago7)).length;
-  return{total,tuev,wrk,clean};
+  return{total,tuev,wrk};
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
@@ -436,7 +451,6 @@ function renderDashboard(){
       <div class="stat-card"><div class="num">${s.total}</div><div class="lbl">Fahrzeuge im Bestand</div></div>
       <div class="stat-card ${s.tuev>0?'danger':''}"><div class="num">${s.tuev}</div><div class="lbl">TÜV in ≤ 90 Tagen fällig</div></div>
       <div class="stat-card ${s.wrk>0?'warn':''}"><div class="num">${s.wrk}</div><div class="lbl">Werkstatt in ≤ 60 Tagen</div></div>
-      <div class="stat-card coral"><div class="num">${s.clean}</div><div class="lbl">Fahrzeuge desinfiziert (7 Tage)</div></div>
     </div>
     <div class="toolbar">
       <div class="search-wrap">
@@ -685,17 +699,17 @@ function doSave(id){
   if(id){
     const idx=data.findIndex(x=>x.id===id);
     data[idx]={...data[idx],...fields};
-    save(data);showToast('Gespeichert.','ok-toast');showView('detail',id);
+    save(data);syncTermine();showToast('Gespeichert.','ok-toast');showView('detail',id);
   } else {
     const nv={id:uid(),...fields,wartungen:[],reifenwechsel:[],reinigungen:[],unfaelle:[]};
-    data.push(nv);save(data);showToast('Fahrzeug angelegt.','ok-toast');showView('detail',nv.id);
+    data.push(nv);save(data);syncTermine();showToast('Fahrzeug angelegt.','ok-toast');showView('detail',nv.id);
   }
 }
 
 function delVehicle(id){
   const v=data.find(x=>x.id===id);
   if(!confirm(`Fahrzeug "${v.kennzeichen}" wirklich löschen?\nAlle Einträge werden gelöscht.`)) return;
-  data=data.filter(x=>x.id!==id);save(data);showToast('Fahrzeug gelöscht.');showView('dashboard');
+  data=data.filter(x=>x.id!==id);save(data);syncTermine();showToast('Fahrzeug gelöscht.');showView('dashboard');
 }
 function delEntry(vid,type,eid){
   if(!confirm('Diesen Eintrag löschen?')) return;
@@ -979,6 +993,215 @@ function showToast(msg,cls=''){
   const t=document.getElementById('toast');
   t.textContent=msg;t.className='toast show'+(cls?' '+cls:'');
   clearTimeout(t._t);t._t=setTimeout(()=>t.className='toast',3500);
+}
+</script>
+
+<!-- ── CHATBOT WIDGET ─────────────────────────────────────────────────────── -->
+<button id="chatFab" onclick="chatToggle()" title="KI-Assistent öffnen">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  </svg>
+</button>
+
+<div id="chatPanel">
+  <div class="chat-hdr">
+    <div class="chat-hdr-title"><span class="chat-dot"></span>Fuhrpark-Assistent</div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button class="chat-hdr-btn" onclick="chatResetKey()" title="API-Key ändern">Key ändern</button>
+      <button class="chat-hdr-btn" onclick="chatClose()" style="font-size:1.1rem;padding:2px 8px;line-height:1">✕</button>
+    </div>
+  </div>
+  <div id="chatSetup">
+    <p class="cs-title">KI-Assistent einrichten</p>
+    <p class="cs-desc">Für den Assistenten wird ein Claude API-Key benötigt. Er wird nur lokal in Ihrem Browser gespeichert und nie übertragen.</p>
+    <input id="chatApiKey" class="cs-input" type="password" placeholder="sk-ant-api03-…" onkeydown="if(event.key==='Enter')chatSaveKey()"/>
+    <p id="chatKeyErr" class="cs-err">Ungültiger Key — muss mit sk-ant- beginnen.</p>
+    <button class="cs-btn" onclick="chatSaveKey()">Speichern &amp; starten</button>
+    <p class="cs-hint">API-Key erhalten Sie unter <strong>console.anthropic.com</strong></p>
+  </div>
+  <div id="chatInterface">
+    <div id="chatMessages"></div>
+    <div id="chatInputWrap">
+      <input id="chatInput" type="text" placeholder="Frage stellen …" onkeydown="if(event.key==='Enter'&&!this.disabled)chatSend()"/>
+      <button id="chatSendBtn" onclick="chatSend()">➤</button>
+    </div>
+  </div>
+</div>
+
+<style>
+/* ── CHATBOT ────────────────────────────────────────────────────────────── */
+#chatFab{position:fixed;bottom:82px;right:24px;z-index:9990;width:54px;height:54px;border-radius:50%;background:var(--kth-blue);border:none;cursor:pointer;box-shadow:0 4px 18px rgba(0,86,164,.38);display:flex;align-items:center;justify-content:center;transition:transform .15s,box-shadow .15s}
+#chatFab:hover{transform:scale(1.08);box-shadow:0 6px 24px rgba(0,86,164,.48)}
+#chatFab svg{width:24px;height:24px;color:white}
+#chatPanel{position:fixed;bottom:150px;right:24px;z-index:9989;width:360px;max-height:480px;background:white;border-radius:16px;box-shadow:0 8px 40px rgba(0,50,100,.22);border:1px solid var(--border);display:none;flex-direction:column;overflow:hidden}
+.chat-hdr{background:var(--kth-blue);color:white;padding:13px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.chat-hdr-title{font-weight:700;font-size:.92rem;display:flex;align-items:center;gap:8px}
+.chat-dot{width:8px;height:8px;border-radius:50%;background:#4ade80;flex-shrink:0}
+.chat-hdr-btn{background:rgba(255,255,255,.18);border:none;color:white;cursor:pointer;padding:4px 9px;border-radius:6px;font-size:.78rem;font-family:inherit}
+.chat-hdr-btn:hover{background:rgba(255,255,255,.3)}
+#chatSetup{padding:22px 18px;flex-direction:column;gap:12px;flex:1;display:none;overflow-y:auto}
+.cs-title{font-weight:700;color:var(--kth-blue);font-size:.98rem}
+.cs-desc{font-size:.83rem;color:var(--text-soft);line-height:1.5}
+.cs-input{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:.88rem;font-family:inherit;outline:none}
+.cs-input:focus{border-color:var(--kth-blue)}
+.cs-err{color:var(--danger);font-size:.8rem;display:none}
+.cs-btn{width:100%;padding:10px;background:var(--kth-blue);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit;font-size:.9rem}
+.cs-btn:hover{background:var(--kth-blue-dark)}
+.cs-hint{font-size:.75rem;color:var(--text-soft)}
+#chatInterface{flex:1;flex-direction:column;display:none;overflow:hidden;min-height:0}
+#chatMessages{flex:1;overflow-y:auto;padding:12px 10px;display:flex;flex-direction:column;gap:8px;min-height:0}
+.chat-msg{max-width:87%;padding:9px 13px;border-radius:12px;font-size:.87rem;line-height:1.5;word-break:break-word;white-space:pre-wrap}
+.chat-user{background:var(--kth-blue);color:white;align-self:flex-end;border-bottom-right-radius:3px}
+.chat-bot{background:var(--kth-blue-bg);color:var(--text);align-self:flex-start;border-bottom-left-radius:3px}
+.chat-typing{padding:10px 14px;display:flex;align-items:center;gap:4px}
+.chat-typing span{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--kth-blue);animation:chatBounce .9s infinite}
+.chat-typing span:nth-child(2){animation-delay:.15s}
+.chat-typing span:nth-child(3){animation-delay:.3s}
+@keyframes chatBounce{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-5px);opacity:1}}
+#chatInputWrap{padding:10px;border-top:1px solid var(--border);display:flex;gap:7px;background:white;flex-shrink:0}
+#chatInputWrap input{flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:.875rem;font-family:inherit;outline:none}
+#chatInputWrap input:focus{border-color:var(--kth-blue)}
+#chatInputWrap input:disabled{background:var(--bg-alt)}
+#chatSendBtn{padding:9px 13px;background:var(--kth-blue);color:white;border:none;border-radius:8px;cursor:pointer;font-size:.95rem;transition:.15s}
+#chatSendBtn:hover{background:var(--kth-blue-dark)}
+#chatSendBtn:disabled{opacity:.5;cursor:default}
+</style>
+
+<script>
+// ── CHATBOT ──────────────────────────────────────────────────────────────────
+const CHAT_KEY='kth_chat_apikey';
+let chatHistory=[];
+let chatOpen=false;
+
+function chatToggle(){
+  chatOpen=!chatOpen;
+  const panel=document.getElementById('chatPanel');
+  panel.style.display=chatOpen?'flex':'none';
+  if(!chatOpen) return;
+  const hasKey=!!localStorage.getItem(CHAT_KEY);
+  document.getElementById('chatSetup').style.display=hasKey?'none':'flex';
+  document.getElementById('chatInterface').style.display=hasKey?'flex':'none';
+  if(hasKey&&!chatHistory.length){
+    chatAppend('bot','Hallo! Ich kenne alle '+data.length+' Fahrzeuge im Bestand. Was möchten Sie wissen?\n\nBeispiele:\n• „Welche Fahrzeuge brauchen bald TÜV?"\n• „Wann war das letzte Mal Fahrzeug PM-KH 42 in der Werkstatt?"\n• „Welches Fahrzeug wurde zuletzt gereinigt?"');
+  }
+  if(hasKey) setTimeout(()=>document.getElementById('chatInput')?.focus(),100);
+}
+
+function chatClose(){
+  chatOpen=false;
+  document.getElementById('chatPanel').style.display='none';
+}
+
+function chatSaveKey(){
+  const key=document.getElementById('chatApiKey').value.trim();
+  const errEl=document.getElementById('chatKeyErr');
+  if(!key.startsWith('sk-ant-')){errEl.style.display='block';return;}
+  errEl.style.display='none';
+  localStorage.setItem(CHAT_KEY,key);
+  document.getElementById('chatSetup').style.display='none';
+  document.getElementById('chatInterface').style.display='flex';
+  chatAppend('bot','Hallo! Ich kenne alle '+data.length+' Fahrzeuge im Bestand. Was möchten Sie wissen?\n\nBeispiele:\n• „Welche Fahrzeuge brauchen bald TÜV?"\n• „Wann war das letzte Mal Fahrzeug PM-KH 42 in der Werkstatt?"\n• „Welches Fahrzeug wurde zuletzt gereinigt?"');
+  setTimeout(()=>document.getElementById('chatInput')?.focus(),100);
+}
+
+function chatResetKey(){
+  localStorage.removeItem(CHAT_KEY);
+  chatHistory=[];
+  document.getElementById('chatMessages').innerHTML='';
+  document.getElementById('chatInterface').style.display='none';
+  document.getElementById('chatSetup').style.display='flex';
+  document.getElementById('chatApiKey').value='';
+}
+
+function chatBuildContext(){
+  const dateStr=new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const vInfo=data.map(v=>{
+    const td=daysTo(v.naechsterTuev);
+    const wd=daysTo(v.naechsteWerkstatt);
+    const lkm=getLastKm(v);
+    const lastRein=(v.reinigungen||[]).sort((a,b)=>b.datum.localeCompare(a.datum))[0];
+    const lastWart=(v.wartungen||[]).sort((a,b)=>b.datum.localeCompare(a.datum)).slice(0,3);
+    let s=v.kennzeichen+' – '+(v.marke||'')+' '+(v.modell||'')+' (Erstzulassung: '+fmt(v.erstzulassung)+')';
+    s+='\n  TÜV: '+(v.naechsterTuev?fmt(v.naechsterTuev):'nicht eingetragen');
+    if(td!==null) s+=' (in '+td+' Tagen'+(td<0?' – ÜBERFÄLLIG':td<=30?' – DRINGEND':td<=90?' – bald':'')+')';
+    s+='\n  Werkstatt: '+(v.naechsteWerkstatt?fmt(v.naechsteWerkstatt):'nicht eingetragen');
+    if(wd!==null) s+=' (in '+wd+' Tagen)';
+    if(lkm) s+='\n  km-Stand: '+lkm.km.toLocaleString('de-DE')+' km ('+fmt(lkm.datum)+')';
+    if(lastRein) s+='\n  Letzte Reinigung: '+fmt(lastRein.datum)+' – '+(lastRein.art||'');
+    if(lastWart.length) s+='\n  Letzte Wartungen: '+lastWart.map(w=>fmt(w.datum)+': '+w.art).join('; ');
+    if((v.unfaelle||[]).length) s+='\n  Unfälle: '+v.unfaelle.length+' eingetragen';
+    return s;
+  }).join('\n\n');
+  return 'Du bist ein hilfreicher Fuhrpark-Assistent für den ambulanten Pflegedienst Katharinenhof. Heute ist der '+dateStr+'. Antworte immer auf Deutsch, präzise und übersichtlich. Verwende Listen wo sinnvoll.\n\nFahrzeugbestand ('+data.length+' Fahrzeuge):\n\n'+(vInfo||'Noch keine Fahrzeuge eingetragen.')+'\n\nBei TÜV/Terminsfragen sortiere nach Dringlichkeit (überfällig → dringend → bald). Bei unklarem Kennzeichen bitte nachfragen.';
+}
+
+function chatAppend(role,text){
+  const msgs=document.getElementById('chatMessages');
+  const div=document.createElement('div');
+  div.className='chat-msg chat-'+role;
+  div.textContent=text;
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+}
+
+function chatShowTyping(){
+  const msgs=document.getElementById('chatMessages');
+  const div=document.createElement('div');
+  div.className='chat-msg chat-bot chat-typing';
+  div.id='chatTypingDot';
+  div.innerHTML='<span></span><span></span><span></span>';
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+}
+
+async function chatSend(){
+  const input=document.getElementById('chatInput');
+  const text=(input.value||'').trim();
+  if(!text) return;
+  const apiKey=localStorage.getItem(CHAT_KEY);
+  if(!apiKey){chatResetKey();return;}
+  chatAppend('user',text);
+  chatHistory.push({role:'user',content:text});
+  input.value='';
+  input.disabled=true;
+  const btn=document.getElementById('chatSendBtn');
+  if(btn) btn.disabled=true;
+  chatShowTyping();
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key':apiKey,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:JSON.stringify({
+        model:'claude-haiku-4-5-20251001',
+        max_tokens:1024,
+        system:chatBuildContext(),
+        messages:chatHistory.slice(-12)
+      })
+    });
+    const typing=document.getElementById('chatTypingDot');
+    if(typing) typing.remove();
+    if(!resp.ok){
+      const err=await resp.json().catch(()=>({}));
+      throw new Error(err.error?.message||'HTTP '+resp.status);
+    }
+    const result=await resp.json();
+    const answer=result.content?.[0]?.text||'(Keine Antwort erhalten)';
+    chatHistory.push({role:'assistant',content:answer});
+    chatAppend('bot',answer);
+  }catch(e){
+    const typing=document.getElementById('chatTypingDot');
+    if(typing) typing.remove();
+    chatAppend('bot','Fehler: '+e.message+'\n\nBitte API-Key prüfen (Taste „Key ändern").');
+  }finally{
+    input.disabled=false;
+    if(btn) btn.disabled=false;
+    input.focus();
+  }
 }
 </script>
 </body>
