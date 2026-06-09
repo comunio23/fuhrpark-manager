@@ -299,17 +299,13 @@ main{max-width:1500px;margin:0 auto;padding:32px 24px}
 <div class="toast" id="toast"></div>
 
 <script>
-// ── SYNC-ENDPOINT (GAS Web App URL — nach Deployment hier eintragen) ─────────
-const GAS_SYNC_URL = 'https://script.google.com/macros/s/AKfycbxwvd47YlWn4L8VTeOgQ3Wq_yfypSFMwtrHn-SccPnvWNTjIYftZbKg39EzWpKpMIGn/exec';
-
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 const PW='kaTha14612';
 function checkPw(){
   if(document.getElementById('pwInput').value===PW){
     sessionStorage.setItem('fp_auth','1');
     document.getElementById('loginScreen').style.display='none';
-    render();
-    loadFromGAS();
+    loadRemote().then(render);
   } else {
     const e=document.getElementById('pwErr');
     e.style.display='block';
@@ -322,8 +318,24 @@ function checkPw(){
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let state={view:'dashboard',vid:null,search:'',filter:'all',sort:'kfz'};
 const KEY='kth_fuhrpark_v3';
-function load(){try{return JSON.parse(localStorage.getItem(KEY))||[];}catch{return [];}}
-function save(d){localStorage.setItem(KEY,JSON.stringify(d));}
+function loadLocal(){try{return JSON.parse(localStorage.getItem(KEY))||[];}catch{return [];}}
+function save(d){
+  localStorage.setItem(KEY,JSON.stringify(d));
+  fetch('/api/data',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).catch(()=>{});
+}
+async function loadRemote(){
+  try{
+    const res=await fetch('/api/data');
+    if(!res.ok) return;
+    const remote=await res.json();
+    if(Array.isArray(remote)&&remote.length>0){
+      data=remote.map(normalize);
+      localStorage.setItem(KEY,JSON.stringify(data));
+      return;
+    }
+  }catch(e){}
+  data=loadLocal().map(normalize);
+}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
 
 // ── NORMIERUNG ────────────────────────────────────────────────────────────────
@@ -338,11 +350,10 @@ function normalize(v){
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-let data=load().map(normalize);
+let data=loadLocal().map(normalize);
 if(sessionStorage.getItem('fp_auth')==='1'){
   document.getElementById('loginScreen').style.display='none';
-  render();
-  loadFromGAS();
+  loadRemote().then(render);
 }
 
 // ── ROUTER ────────────────────────────────────────────────────────────────────
@@ -405,42 +416,7 @@ function updateTuevHints(){
     +items.map(s=>`<button type="button" class="hint-btn${s.first?' hint-first':''}" onclick="document.getElementById('f_tuev').value='${s.val}'">${s.lbl}</button>`).join('');
 }
 
-// ── SYNC ZU GAS ───────────────────────────────────────────────────────────────
-function stripPhotos(v){
-  const c=Object.assign({},v);
-  c.unfaelle=(c.unfaelle||[]).map(u=>{const u2=Object.assign({},u);delete u2.fotos;return u2;});
-  c.wartungen=(c.wartungen||[]).map(w=>{const w2=Object.assign({},w);delete w2.dokumente;return w2;});
-  return c;
-}
-function syncTermine(){
-  if(!GAS_SYNC_URL) return;
-  const payload=data.map(stripPhotos);
-  fetch(GAS_SYNC_URL,{method:'POST',body:JSON.stringify(payload),mode:'no-cors'})
-    .catch(()=>{});
-}
-async function loadFromGAS(){
-  if(!GAS_SYNC_URL) return;
-  try{
-    const res=await fetch(GAS_SYNC_URL,{mode:'cors'});
-    if(!res.ok) return;
-    const gasData=await res.json();
-    if(!Array.isArray(gasData)||gasData.length===0) return;
-    const localData=load();
-    const localMap={};
-    localData.forEach(v=>{localMap[v.id]=v;});
-    const merged=gasData.map(v=>{
-      const loc=localMap[v.id];
-      if(loc){
-        v.unfaelle=(v.unfaelle||[]).map((u,i)=>({...u,fotos:(loc.unfaelle&&loc.unfaelle[i])?loc.unfaelle[i].fotos||[]:[] }));
-        v.wartungen=(v.wartungen||[]).map((w,i)=>({...w,dokumente:(loc.wartungen&&loc.wartungen[i])?loc.wartungen[i].dokumente||[]:[] }));
-      }
-      return v;
-    });
-    data=merged.map(normalize);
-    save(data);
-    render();
-  }catch(e){}
-}
+// (Datenspeicherung via Netlify Blobs — save() + loadRemote() oben)
 
 // ── STATS ─────────────────────────────────────────────────────────────────────
 function stats(){
@@ -724,17 +700,17 @@ function doSave(id){
   if(id){
     const idx=data.findIndex(x=>x.id===id);
     data[idx]={...data[idx],...fields};
-    save(data);syncTermine();showToast('Gespeichert.','ok-toast');showView('detail',id);
+    save(data);showToast('Gespeichert.','ok-toast');showView('detail',id);
   } else {
     const nv={id:uid(),...fields,wartungen:[],reifenwechsel:[],reinigungen:[],unfaelle:[]};
-    data.push(nv);save(data);syncTermine();showToast('Fahrzeug angelegt.','ok-toast');showView('detail',nv.id);
+    data.push(nv);save(data);showToast('Fahrzeug angelegt.','ok-toast');showView('detail',nv.id);
   }
 }
 
 function delVehicle(id){
   const v=data.find(x=>x.id===id);
   if(!confirm(`Fahrzeug "${v.kennzeichen}" wirklich löschen?\nAlle Einträge werden gelöscht.`)) return;
-  data=data.filter(x=>x.id!==id);save(data);syncTermine();showToast('Fahrzeug gelöscht.');showView('dashboard');
+  data=data.filter(x=>x.id!==id);save(data);showToast('Fahrzeug gelöscht.');showView('dashboard');
 }
 function delEntry(vid,type,eid){
   if(!confirm('Diesen Eintrag löschen?')) return;
