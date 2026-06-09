@@ -309,6 +309,7 @@ function checkPw(){
     sessionStorage.setItem('fp_auth','1');
     document.getElementById('loginScreen').style.display='none';
     render();
+    loadFromGAS();
   } else {
     const e=document.getElementById('pwErr');
     e.style.display='block';
@@ -341,6 +342,7 @@ let data=load().map(normalize);
 if(sessionStorage.getItem('fp_auth')==='1'){
   document.getElementById('loginScreen').style.display='none';
   render();
+  loadFromGAS();
 }
 
 // ── ROUTER ────────────────────────────────────────────────────────────────────
@@ -404,17 +406,40 @@ function updateTuevHints(){
 }
 
 // ── SYNC ZU GAS ───────────────────────────────────────────────────────────────
+function stripPhotos(v){
+  const c=Object.assign({},v);
+  c.unfaelle=(c.unfaelle||[]).map(u=>{const u2=Object.assign({},u);delete u2.fotos;return u2;});
+  c.wartungen=(c.wartungen||[]).map(w=>{const w2=Object.assign({},w);delete w2.dokumente;return w2;});
+  return c;
+}
 function syncTermine(){
   if(!GAS_SYNC_URL) return;
-  const termine=data.map(v=>({
-    kennzeichen:v.kennzeichen,
-    marke:v.marke,
-    modell:v.modell,
-    naechsterTuev:v.naechsterTuev||'',
-    naechsteWerkstatt:v.naechsteWerkstatt||''
-  }));
-  fetch(GAS_SYNC_URL,{method:'POST',body:JSON.stringify(termine),mode:'no-cors'})
+  const payload=data.map(stripPhotos);
+  fetch(GAS_SYNC_URL,{method:'POST',body:JSON.stringify(payload),mode:'no-cors'})
     .catch(()=>{});
+}
+async function loadFromGAS(){
+  if(!GAS_SYNC_URL) return;
+  try{
+    const res=await fetch(GAS_SYNC_URL,{mode:'cors'});
+    if(!res.ok) return;
+    const gasData=await res.json();
+    if(!Array.isArray(gasData)||gasData.length===0) return;
+    const localData=load();
+    const localMap={};
+    localData.forEach(v=>{localMap[v.id]=v;});
+    const merged=gasData.map(v=>{
+      const loc=localMap[v.id];
+      if(loc){
+        v.unfaelle=(v.unfaelle||[]).map((u,i)=>({...u,fotos:(loc.unfaelle&&loc.unfaelle[i])?loc.unfaelle[i].fotos||[]:[] }));
+        v.wartungen=(v.wartungen||[]).map((w,i)=>({...w,dokumente:(loc.wartungen&&loc.wartungen[i])?loc.wartungen[i].dokumente||[]:[] }));
+      }
+      return v;
+    });
+    data=merged.map(normalize);
+    save(data);
+    render();
+  }catch(e){}
 }
 
 // ── STATS ─────────────────────────────────────────────────────────────────────
