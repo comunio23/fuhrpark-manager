@@ -355,6 +355,7 @@ function normalize(v){
   v.reifenwechsel=v.reifenwechsel||[];
   v.reinigungen=v.reinigungen||[];
   v.unfaelle=v.unfaelle||[];
+  v.kilometerstand=v.kilometerstand??0;
   return v;
 }
 
@@ -518,7 +519,7 @@ function cardHtml(v){
           <div class="ci"><span class="l">Farbe</span><span class="v">${v.farbe||'—'}</span></div>
         </div>
         <div class="card-km-row">
-          <span class="card-km-val">${lkm?lkm.km.toLocaleString('de-DE'):v.kilometerstand.toLocaleString('de-DE')} km</span>
+          <span class="card-km-val">${lkm?lkm.km.toLocaleString('de-DE'):(v.kilometerstand||0).toLocaleString('de-DE')} km</span>
           <span class="card-km-meta">${lkm?`${lkm.quelle} · ${fmt(lkm.datum)}`:'aktuell'}</span>
         </div>
         <div class="card-pills">
@@ -552,7 +553,7 @@ function renderDetail(id){
     </div>
     <div class="info-cards">
       <div class="icard"><div class="l">Erstzulassung</div><div class="v">${fmt(v.erstzulassung)}</div></div>
-      <div class="icard"><div class="l">Letzter KM-Stand</div><div class="v">${lkm?lkm.km.toLocaleString('de-DE'):v.kilometerstand.toLocaleString('de-DE')} km<small>${lkm?`${lkm.quelle}, ${fmt(lkm.datum)}`:'manuell eingetragen'}</small></div></div>
+      <div class="icard"><div class="l">Letzter KM-Stand</div><div class="v">${lkm?lkm.km.toLocaleString('de-DE'):(v.kilometerstand||0).toLocaleString('de-DE')} km<small>${lkm?`${lkm.quelle}, ${fmt(lkm.datum)}`:'manuell eingetragen'}</small></div></div>
       <div class="icard"><div class="l">Kraftstoff</div><div class="v">${v.kraftstoff||'—'}</div></div>
       <div class="icard"><div class="l">Nächster TÜV</div>
         <div class="v ${tc}-color">${fmt(v.naechsterTuev)}<small>${td===null?'nicht eingetragen':td<0?`ÜBERFÄLLIG (${Math.abs(td)} Tage)`:td+' Tage verbleibend'}</small></div>
