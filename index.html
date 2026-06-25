@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8"/>
@@ -22,6 +22,12 @@
 }
 html{scroll-behavior:smooth}
 body{font-family:'Source Sans 3',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:16px;line-height:1.5}
+
+/* LOADING */
+@keyframes spin{to{transform:rotate(360deg)}}
+#loadingOverlay{position:fixed;inset:0;background:rgba(245,247,250,.92);z-index:10000;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px}
+.loading-spinner{width:48px;height:48px;border:4px solid var(--kth-blue-bg);border-top-color:var(--kth-blue);border-radius:50%;animation:spin 1s linear infinite}
+.loading-label{font-weight:700;color:var(--kth-blue);font-size:.95rem}
 
 /* LOGIN */
 #loginScreen{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center}
@@ -57,7 +63,7 @@ main{max-width:1500px;margin:0 auto;padding:32px 24px}
 .page-subtitle{font-size:.9rem;color:var(--text-soft)}
 
 /* STATS */
-.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
 .stat-card{background:var(--white);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px 22px;border-top:4px solid var(--kth-blue);box-shadow:var(--shadow-sm)}
 .stat-card.coral{border-top-color:var(--kth-coral)}
 .stat-card.warn{border-top-color:var(--warn)}
@@ -170,7 +176,6 @@ main{max-width:1500px;margin:0 auto;padding:32px 24px}
 .dok-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
 .dok-badge{display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:600;padding:3px 9px;border-radius:5px;background:var(--kth-blue-bg);color:var(--kth-blue);border:1px solid rgba(0,86,164,.18);cursor:pointer;transition:.15s;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dok-badge:hover{background:#dbeeff}
-.dok-badge-active{background:var(--kth-blue);color:var(--white)}
 
 /* FOTO-GALERIE */
 .foto-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
@@ -186,14 +191,12 @@ main{max-width:1500px;margin:0 auto;padding:32px 24px}
 .fsection-title::before{content:'';width:4px;height:16px;background:var(--kth-coral);border-radius:2px}
 .frow{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px}
 .frow.one{grid-template-columns:1fr}
-.frow.three{grid-template-columns:1fr 1fr 1fr}
 .field{display:flex;flex-direction:column;gap:5px}
 .field label{font-size:.82rem;font-weight:600;color:var(--text-mid)}
 .field input,.field select,.field textarea{padding:9px 13px;border:1.5px solid var(--border);border-radius:8px;font-size:.9rem;font-family:inherit;outline:none;transition:.15s;color:var(--text);background:var(--white)}
 .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--kth-blue);box-shadow:0 0 0 3px rgba(0,86,164,.1)}
 .field textarea{resize:vertical;min-height:80px}
 .field input[type="file"]{padding:6px 10px;font-size:.82rem;cursor:pointer;background:var(--bg)}
-.field-hint{font-size:.74rem;color:var(--text-soft);font-style:italic;margin-top:3px}
 
 /* TÜV VORSCHLÄGE */
 .tuev-hints{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center;min-height:26px}
@@ -242,11 +245,17 @@ main{max-width:1500px;margin:0 auto;padding:32px 24px}
 /* RESPONSIVE */
 @media(max-width:1300px){.vehicles-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:900px){.stats-row{grid-template-columns:1fr 1fr}.vehicles-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:680px){nav{padding:0 16px}main{padding:18px 14px}.frow{grid-template-columns:1fr}.frow.three{grid-template-columns:1fr}.mrow{grid-template-columns:1fr}.vehicles-grid{grid-template-columns:1fr}}
+@media(max-width:680px){nav{padding:0 16px}main{padding:18px 14px}.frow{grid-template-columns:1fr}.mrow{grid-template-columns:1fr}.vehicles-grid{grid-template-columns:1fr}}
 @media(max-width:440px){.stats-row{grid-template-columns:1fr 1fr}.nav-brand-text .sub{display:none}}
 </style>
 </head>
 <body>
+
+<!-- LOADING -->
+<div id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-label">Daten werden geladen …</div>
+</div>
 
 <!-- LOGIN -->
 <div id="loginScreen">
@@ -298,54 +307,158 @@ main{max-width:1500px;margin:0 auto;padding:32px 24px}
 
 <div class="toast" id="toast"></div>
 
+<!-- Supabase CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <script>
+// ── SUPABASE CONFIG ───────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://bembfesrfepsftragaeq.supabase.co';
+const SUPABASE_KEY = 'DEIN_SUPABASE_ANON_KEY'; // Settings → API → anon public ersetzen
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 // ── AUTH ──────────────────────────────────────────────────────────────────────
-function getToken(){return sessionStorage.getItem('fp_token');}
-async function checkPw(){
-  const pw=document.getElementById('pwInput').value;
-  try{
-    const res=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
-    if(res.ok){
-      const {token}=await res.json();
-      sessionStorage.setItem('fp_token',token);
-      document.getElementById('loginScreen').style.display='none';
-      loadRemote().then(render);
-    } else {
-      const e=document.getElementById('pwErr');
-      e.style.display='block';
-      document.getElementById('pwInput').value='';
-      document.getElementById('pwInput').focus();
-      setTimeout(()=>e.style.display='none',3000);
-    }
-  }catch(err){
+const PW = 'kaTha14612';
+function checkPw() {
+  if (document.getElementById('pwInput').value === PW) {
+    sessionStorage.setItem('fp_auth','1');
+    document.getElementById('loginScreen').style.display='none';
+    init();
+  } else {
     const e=document.getElementById('pwErr');
     e.style.display='block';
+    document.getElementById('pwInput').value='';
+    document.getElementById('pwInput').focus();
     setTimeout(()=>e.style.display='none',3000);
   }
 }
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let state={view:'dashboard',vid:null,search:'',filter:'all',sort:'kfz'};
-const KEY='kth_fuhrpark_v3';
-function loadLocal(){try{return JSON.parse(localStorage.getItem(KEY))||[];}catch{return [];}}
-function save(d){
-  localStorage.setItem(KEY,JSON.stringify(d));
-  fetch('/api/data',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+getToken()},body:JSON.stringify(d)}).then(r=>{if(!r.ok)throw new Error(r.status);}).catch(()=>{showToast('Verbindungsfehler — Daten nur lokal gespeichert.','err-toast');});
-}
-async function loadRemote(){
-  try{
-    const res=await fetch('/api/data',{headers:{'Authorization':'Bearer '+getToken()}});
-    if(!res.ok) return;
-    const remote=await res.json();
-    if(Array.isArray(remote)){
-      data=remote.map(normalize);
-      localStorage.setItem(KEY,JSON.stringify(data));
-      return;
-    }
-  }catch(e){}
-  data=loadLocal().map(normalize);
-}
+let data=[];
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+
+// ── DB LAYER ──────────────────────────────────────────────────────────────────
+async function loadFromDB(){
+  const {data:rows,error}=await db.from('fahrzeuge').select('*').order('kennzeichen');
+  if(error) throw error;
+  return rows.map(row=>({
+    id:row.id,
+    kennzeichen:row.kennzeichen,
+    marke:row.marke||'',
+    modell:row.modell||'',
+    typ:row.typ||'PKW',
+    farbe:row.farbe||'',
+    kraftstoff:row.kraftstoff||'Diesel',
+    erstzulassung:row.erstzulassung||'',
+    kilometerstand:row.kilometerstand||0,
+    naechsterTuev:row.naechster_tuev||'',
+    naechsteWerkstatt:row.naechste_werkstatt||'',
+    notizen:row.notizen||'',
+    wartungen:(row.wartungen||[]).map(w=>({dokumente:[],...w})),
+    reifenwechsel:row.reifenwechsel||[],
+    reinigungen:row.reinigungen||[],
+    unfaelle:row.unfaelle||[]
+  }));
+}
+
+async function saveVehicle(v){
+  const {error}=await db.from('fahrzeuge').upsert({
+    id:v.id,
+    kennzeichen:v.kennzeichen,
+    marke:v.marke,
+    modell:v.modell,
+    typ:v.typ,
+    farbe:v.farbe,
+    kraftstoff:v.kraftstoff,
+    erstzulassung:v.erstzulassung,
+    kilometerstand:v.kilometerstand,
+    naechster_tuev:v.naechsterTuev,
+    naechste_werkstatt:v.naechsteWerkstatt,
+    notizen:v.notizen,
+    wartungen:v.wartungen,
+    reifenwechsel:v.reifenwechsel,
+    reinigungen:v.reinigungen,
+    unfaelle:v.unfaelle,
+    updated_at:new Date().toISOString()
+  });
+  if(error){showToast('Fehler beim Speichern: '+error.message,'err-toast');return false;}
+  return true;
+}
+
+async function removeStoragePaths(paths){
+  if(paths.length) await db.storage.from('fuhrpark').remove(paths);
+}
+
+async function deleteVehicleDB(id){
+  const v=data.find(x=>x.id===id);
+  if(v){
+    const paths=[];
+    (v.unfaelle||[]).forEach(u=>(u.fotos||[]).forEach(f=>f.path&&paths.push(f.path)));
+    (v.wartungen||[]).forEach(w=>(w.dokumente||[]).forEach(d=>d.path&&paths.push(d.path)));
+    await removeStoragePaths(paths);
+  }
+  const {error}=await db.from('fahrzeuge').delete().eq('id',id);
+  if(error){showToast('Fehler beim Löschen: '+error.message,'err-toast');return false;}
+  return true;
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+async function init(){
+  showLoading(true);
+  try{data=await loadFromDB();}
+  catch(err){showToast('Verbindungsfehler: '+err.message,'err-toast');data=[];}
+  showLoading(false);
+  render();
+}
+
+function showLoading(v){
+  document.getElementById('loadingOverlay').style.display=v?'flex':'none';
+}
+
+if(sessionStorage.getItem('fp_auth')==='1'){
+  document.getElementById('loginScreen').style.display='none';
+  init();
+}
+
+// ── STORAGE LAYER ─────────────────────────────────────────────────────────────
+async function uploadToStorage(blob,path){
+  const {error}=await db.storage.from('fuhrpark').upload(path,blob,{upsert:true});
+  if(error) throw error;
+  return db.storage.from('fuhrpark').getPublicUrl(path).data.publicUrl;
+}
+
+async function resizeAndUpload(file,basePath){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=ev=>{
+      const img=new Image();
+      img.onload=()=>{
+        const maxW=900;
+        const ratio=Math.min(1,maxW/img.width);
+        const c=document.createElement('canvas');
+        c.width=Math.round(img.width*ratio);
+        c.height=Math.round(img.height*ratio);
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        c.toBlob(async blob=>{
+          try{
+            const path=basePath+'_'+uid()+'.jpg';
+            const url=await uploadToStorage(blob,path);
+            resolve({name:file.name,url,path});
+          }catch(err){reject(err);}
+        },'image/jpeg',.72);
+      };
+      img.src=ev.target.result;
+    };
+    r.readAsDataURL(file);
+  });
+}
+
+async function uploadDoc(file,basePath){
+  const ext=file.name.split('.').pop().toLowerCase();
+  const path=basePath+'_'+uid()+'.'+ext;
+  const url=await uploadToStorage(file,path);
+  return{name:file.name,url,path,isPdf:file.type==='application/pdf'};
+}
 
 // ── NORMIERUNG ────────────────────────────────────────────────────────────────
 function normalize(v){
@@ -355,15 +468,7 @@ function normalize(v){
   v.reifenwechsel=v.reifenwechsel||[];
   v.reinigungen=v.reinigungen||[];
   v.unfaelle=v.unfaelle||[];
-  v.kilometerstand=v.kilometerstand??0;
   return v;
-}
-
-// ── INIT ──────────────────────────────────────────────────────────────────────
-let data=loadLocal().map(normalize);
-if(getToken()){
-  document.getElementById('loginScreen').style.display='none';
-  loadRemote().then(render);
 }
 
 // ── ROUTER ────────────────────────────────────────────────────────────────────
@@ -373,6 +478,7 @@ function render(){
   else if(state.view==='form') renderForm(state.vid);
 }
 function showView(v,id=null){state.view=v;state.vid=id;render();window.scrollTo({top:0,behavior:'smooth'});}
+function showForm(id){state.view='form';state.vid=id;render();window.scrollTo({top:0});}
 
 // ── DATUM-HELFER ──────────────────────────────────────────────────────────────
 function fmt(s){
@@ -395,9 +501,9 @@ function daysTo(s){
 function scls(s){const d=daysTo(s);if(d===null)return'gray';if(d<0||d<=30)return'danger';if(d<=90)return'warn';return'ok';}
 function slbl(s,prefix){
   const d=daysTo(s);
-  if(d===null)return`${prefix}: nicht eingetragen`;
-  if(d<0)return`${prefix}: ÜBERFÄLLIG`;
-  if(d===0)return`${prefix}: Heute!`;
+  if(d===null) return`${prefix}: nicht eingetragen`;
+  if(d<0) return`${prefix}: ÜBERFÄLLIG`;
+  if(d===0) return`${prefix}: Heute!`;
   return`${prefix}: ${fmt(s)} (${d} Tage)`;
 }
 function today(){return new Date().toISOString().slice(0,10);}
@@ -426,14 +532,14 @@ function updateTuevHints(){
     +items.map(s=>`<button type="button" class="hint-btn${s.first?' hint-first':''}" onclick="document.getElementById('f_tuev').value='${s.val}'">${s.lbl}</button>`).join('');
 }
 
-// (Datenspeicherung via Netlify Blobs — save() + loadRemote() oben)
-
 // ── STATS ─────────────────────────────────────────────────────────────────────
 function stats(){
   const total=data.length;
   const tuev=data.filter(v=>{const d=daysTo(v.naechsterTuev);return d!==null&&d<=90;}).length;
   const wrk=data.filter(v=>{const d=daysTo(v.naechsteWerkstatt);return d!==null&&d<=60;}).length;
-  return{total,tuev,wrk};
+  const ago7=new Date(Date.now()-7*86400000).toISOString().slice(0,10);
+  const clean=data.filter(v=>(v.reinigungen||[]).some(r=>r.datum>=ago7)).length;
+  return{total,tuev,wrk,clean};
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
@@ -462,6 +568,7 @@ function renderDashboard(){
       <div class="stat-card"><div class="num">${s.total}</div><div class="lbl">Fahrzeuge im Bestand</div></div>
       <div class="stat-card ${s.tuev>0?'danger':''}"><div class="num">${s.tuev}</div><div class="lbl">TÜV in ≤ 90 Tagen fällig</div></div>
       <div class="stat-card ${s.wrk>0?'warn':''}"><div class="num">${s.wrk}</div><div class="lbl">Werkstatt in ≤ 60 Tagen</div></div>
+      <div class="stat-card coral"><div class="num">${s.clean}</div><div class="lbl">Fahrzeuge desinfiziert (7 Tage)</div></div>
     </div>
     <div class="toolbar">
       <div class="search-wrap">
@@ -485,7 +592,6 @@ function renderDashboard(){
       <span class="data-bar-label">Export:</span>
       <button class="btn-data" onclick="exportCSV()">⬇ Excel/CSV</button>
       <button class="btn-data" onclick="exportJSON()">⬇ JSON-Backup</button>
-      <button class="btn-data" onclick="exportTermine()" title="Für GitHub-Erinnerungsautomatik">⬇ Termine (GitHub)</button>
       <span class="data-bar-label" style="margin-left:8px">Import:</span>
       <button class="btn-data" onclick="document.getElementById('fileImport').click()">⬆ JSON laden</button>
       <input type="file" id="fileImport" accept=".json" onchange="importJSON(event)"/>
@@ -519,7 +625,7 @@ function cardHtml(v){
           <div class="ci"><span class="l">Farbe</span><span class="v">${v.farbe||'—'}</span></div>
         </div>
         <div class="card-km-row">
-          <span class="card-km-val">${lkm?lkm.km.toLocaleString('de-DE'):(v.kilometerstand||0).toLocaleString('de-DE')} km</span>
+          <span class="card-km-val">${lkm?lkm.km.toLocaleString('de-DE'):v.kilometerstand.toLocaleString('de-DE')} km</span>
           <span class="card-km-meta">${lkm?`${lkm.quelle} · ${fmt(lkm.datum)}`:'aktuell'}</span>
         </div>
         <div class="card-pills">
@@ -553,7 +659,7 @@ function renderDetail(id){
     </div>
     <div class="info-cards">
       <div class="icard"><div class="l">Erstzulassung</div><div class="v">${fmt(v.erstzulassung)}</div></div>
-      <div class="icard"><div class="l">Letzter KM-Stand</div><div class="v">${lkm?lkm.km.toLocaleString('de-DE'):(v.kilometerstand||0).toLocaleString('de-DE')} km<small>${lkm?`${lkm.quelle}, ${fmt(lkm.datum)}`:'manuell eingetragen'}</small></div></div>
+      <div class="icard"><div class="l">Letzter KM-Stand</div><div class="v">${lkm?lkm.km.toLocaleString('de-DE'):v.kilometerstand.toLocaleString('de-DE')} km<small>${lkm?`${lkm.quelle}, ${fmt(lkm.datum)}`:'manuell eingetragen'}</small></div></div>
       <div class="icard"><div class="l">Kraftstoff</div><div class="v">${v.kraftstoff||'—'}</div></div>
       <div class="icard"><div class="l">Nächster TÜV</div>
         <div class="v ${tc}-color">${fmt(v.naechsterTuev)}<small>${td===null?'nicht eingetragen':td<0?`ÜBERFÄLLIG (${Math.abs(td)} Tage)`:td+' Tage verbleibend'}</small></div>
@@ -613,9 +719,9 @@ function renderDetail(id){
             <span class="apill ${e.repariert?'apill-ok':'apill-open'}">${e.repariert?'✓ Repariert':'⚠ Noch offen'}</span>
             ${e.notiz?`<div class="enote">${e.notiz}</div>`:''}
             ${e.fotos&&e.fotos.length>0?`
-              <div class="foto-row">${e.fotos.map((f,fi)=>`<img class="foto-thumb" src="${f.dataUrl}" title="${f.name}" onclick="viewFoto('${v.id}','${e.id}',${fi})"/>`).join('')}</div>
-              <div class="foto-count">📷 ${e.fotos.length} Foto${e.fotos.length>1?'s':''} gespeichert</div>`:
-              '<div class="foto-count" style="color:var(--text-soft)">Keine Fotos hochgeladen</div>'
+              <div class="foto-row">${e.fotos.map((f,fi)=>`<img class="foto-thumb" src="${f.url||f.dataUrl||''}" title="${f.name}" onclick="viewFoto('${v.id}','${e.id}',${fi})"/>`).join('')}</div>
+              <div class="foto-count">📷 ${e.fotos.length} Foto${e.fotos.length>1?'s':''} gespeichert</div>`
+              :'<div class="foto-count" style="color:var(--text-soft)">Keine Fotos hochgeladen</div>'
             }
           </div>
           <button class="edel" onclick="delEntry('${v.id}','unfaelle','${e.id}')" title="Löschen">✕</button>
@@ -630,7 +736,6 @@ function section(v,type,title,content){
 }
 
 // ── FORM ──────────────────────────────────────────────────────────────────────
-function showForm(id){state.view='form';state.vid=id;render();window.scrollTo({top:0});}
 function renderForm(id){
   const v=id?data.find(x=>x.id===id):null;
   document.getElementById('app').innerHTML=`
@@ -642,7 +747,6 @@ function renderForm(id){
       </div>
     </div>
     <div class="form-wrap"><div class="form-card">
-
       <div class="fsection-title">Kennzeichen &amp; Fahrzeugtyp</div>
       <div class="frow">
         <div class="field"><label>Kennzeichen *</label><input id="f_kfz" value="${v?.kennzeichen||''}" placeholder="z.B. PM-KTH 10"/></div>
@@ -660,7 +764,6 @@ function renderForm(id){
           <select id="f_kraft">${['Diesel','Benzin','Elektro','Hybrid','Erdgas/Benzin (CNG)','LPG / Autogas','Wasserstoff','Sonstiges'].map(k=>`<option${v?.kraftstoff===k?' selected':''}>${k}</option>`).join('')}</select>
         </div>
       </div>
-
       <div class="fsection-title">Stammdaten &amp; Termine</div>
       <div class="frow">
         <div class="field">
@@ -680,7 +783,6 @@ function renderForm(id){
       <div class="frow one">
         <div class="field"><label>Notizen</label><textarea id="f_notiz" placeholder="Besonderheiten zum Fahrzeug …">${v?.notizen||''}</textarea></div>
       </div>
-
       <div class="form-btns">
         <button class="btn-save" onclick="doSave('${v?.id||''}')">💾 Speichern</button>
         <button class="btn-cancel" onclick="showView(${v?`'detail','${v.id}'`:"'dashboard'"})">Abbrechen</button>
@@ -691,7 +793,7 @@ function renderForm(id){
   setTimeout(updateTuevHints,0);
 }
 
-function doSave(id){
+async function doSave(id){
   const kfz=document.getElementById('f_kfz').value.trim();
   const marke=document.getElementById('f_marke').value.trim();
   const modell=document.getElementById('f_modell').value.trim();
@@ -710,23 +812,33 @@ function doSave(id){
   if(id){
     const idx=data.findIndex(x=>x.id===id);
     data[idx]={...data[idx],...fields};
-    save(data);showToast('Gespeichert.','ok-toast');showView('detail',id);
+    showToast('Wird gespeichert …');
+    if(await saveVehicle(data[idx])){showToast('Gespeichert.','ok-toast');showView('detail',id);}
   } else {
-    const nv={id:uid(),...fields,wartungen:[],reifenwechsel:[],reinigungen:[],unfaelle:[]};
-    data.push(nv);save(data);showToast('Fahrzeug angelegt.','ok-toast');showView('detail',nv.id);
+    const nv={id:crypto.randomUUID(),...fields,wartungen:[],reifenwechsel:[],reinigungen:[],unfaelle:[]};
+    showToast('Wird gespeichert …');
+    if(await saveVehicle(nv)){data.push(nv);showToast('Fahrzeug angelegt.','ok-toast');showView('detail',nv.id);}
   }
 }
 
-function delVehicle(id){
+async function delVehicle(id){
   const v=data.find(x=>x.id===id);
   if(!confirm(`Fahrzeug "${v.kennzeichen}" wirklich löschen?\nAlle Einträge werden gelöscht.`)) return;
-  data=data.filter(x=>x.id!==id);save(data);showToast('Fahrzeug gelöscht.');showView('dashboard');
+  if(await deleteVehicleDB(id)){data=data.filter(x=>x.id!==id);showToast('Fahrzeug gelöscht.');showView('dashboard');}
 }
-function delEntry(vid,type,eid){
+
+async function delEntry(vid,type,eid){
   if(!confirm('Diesen Eintrag löschen?')) return;
   const v=data.find(x=>x.id===vid);
+  const entry=v[type].find(e=>e.id===eid);
+  if(entry){
+    const paths=[];
+    (entry.fotos||[]).forEach(f=>f.path&&paths.push(f.path));
+    (entry.dokumente||[]).forEach(d=>d.path&&paths.push(d.path));
+    await removeStoragePaths(paths);
+  }
   v[type]=v[type].filter(e=>e.id!==eid);
-  save(data);renderDetail(vid);showToast('Eintrag gelöscht.');
+  if(await saveVehicle(v)){renderDetail(vid);showToast('Eintrag gelöscht.');}
 }
 
 // ── MODALS ────────────────────────────────────────────────────────────────────
@@ -797,7 +909,7 @@ function openModal(vid,type){
       </div>
       <div class="mfield"><label>Fotos (max. 5)</label>
         <input type="file" id="m_fotos" accept="image/*" multiple onchange="previewFotos()"/>
-        <div class="foto-hinweis">JPG / PNG · werden auf 900 px verkleinert</div>
+        <div class="foto-hinweis">JPG / PNG · werden auf 900 px verkleinert und in der Cloud gespeichert</div>
         <div class="foto-preview" id="fotoPreview"></div>
       </div>
       <div class="mfield"><label>Notiz</label><textarea id="m_not" rows="2"></textarea></div>`
@@ -810,12 +922,12 @@ function openModal(vid,type){
     </div>`;
   document.getElementById('modalWrap').style.display='block';
 }
+
 function closeModal(e){
   if(!e||e.target.classList.contains('modal-overlay'))
     document.getElementById('modalWrap').style.display='none';
 }
 
-// ── DOKUMENT-VORSCHAU ─────────────────────────────────────────────────────────
 function previewDokumente(){
   const input=document.getElementById('m_docs');
   const prev=document.getElementById('dokPreview');
@@ -854,53 +966,20 @@ function previewFotos(){
   });
 }
 
-// ── BILD-KOMPRIMIERUNG ────────────────────────────────────────────────────────
-function resizeImage(file){
-  return new Promise(resolve=>{
-    const r=new FileReader();
-    r.onload=ev=>{
-      const img=new Image();
-      img.onload=()=>{
-        const maxW=900;
-        const ratio=Math.min(1,maxW/img.width);
-        const c=document.createElement('canvas');
-        c.width=Math.round(img.width*ratio);
-        c.height=Math.round(img.height*ratio);
-        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
-        resolve({name:file.name,dataUrl:c.toDataURL('image/jpeg',.72),isPdf:false});
-      };
-      img.src=ev.target.result;
-    };
-    r.readAsDataURL(file);
-  });
-}
-
-function compressFile(file){
-  return new Promise(resolve=>{
-    if(file.type.startsWith('image/')){
-      resizeImage(file).then(resolve);
-    } else {
-      if(file.size>3*1024*1024) showToast('Achtung: Datei über 3 MB.','err-toast');
-      const r=new FileReader();
-      r.onload=ev=>resolve({name:file.name,dataUrl:ev.target.result,isPdf:true});
-      r.readAsDataURL(file);
-    }
-  });
-}
-
 // ── DOKUMENT / FOTO ANZEIGEN ──────────────────────────────────────────────────
 function viewDokument(vid,type,eid,idx){
   const v=data.find(x=>x.id===vid);
   const entry=v?.[type]?.find(x=>x.id===eid);
   const dok=entry?.dokumente?.[idx];
   if(!dok) return;
+  const src=dok.url||dok.dataUrl||'';
   document.getElementById('modalBox').innerHTML=`
     <h2>📎 ${dok.name}</h2>
     ${dok.isPdf
-      ?`<div style="padding:20px;text-align:center;background:var(--bg);border-radius:8px;margin-top:8px"><div style="font-size:.85rem;color:var(--text-soft);margin-bottom:12px">PDF herunterladen</div><a href="${dok.dataUrl}" download="${dok.name}" style="background:var(--kth-blue);color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:700">⬇ PDF herunterladen</a></div>`
-      :`<img class="lightbox-img" src="${dok.dataUrl}"/>`}
+      ?`<div style="padding:20px;text-align:center;background:var(--bg);border-radius:8px;margin-top:8px"><div style="font-size:.85rem;color:var(--text-soft);margin-bottom:12px">PDF öffnen oder herunterladen</div><a href="${src}" target="_blank" rel="noopener" style="background:var(--kth-blue);color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:700">⬇ PDF öffnen</a></div>`
+      :`<img class="lightbox-img" src="${src}"/>`}
     <div class="modal-btns">
-      <a href="${dok.dataUrl}" download="${dok.name}" class="btn-modal-cancel">⬇ Herunterladen</a>
+      <a href="${src}" download="${dok.name}" class="btn-modal-cancel">⬇ Herunterladen</a>
       <button class="btn-modal-cancel" onclick="closeModal()">Schließen</button>
     </div>`;
   document.getElementById('modalWrap').style.display='block';
@@ -911,10 +990,11 @@ function viewFoto(vid,eid,fi){
   const e=v?.unfaelle.find(x=>x.id===eid);
   const f=e?.fotos?.[fi];
   if(!f) return;
+  const src=f.url||f.dataUrl||'';
   document.getElementById('modalBox').innerHTML=`
     <h2>📷 Unfallfotos — ${v.kennzeichen}</h2>
-    <img class="lightbox-img" src="${f.dataUrl}"/>
-    ${e.fotos.length>1?`<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">${e.fotos.map((x,i)=>`<img src="${x.dataUrl}" style="width:60px;height:46px;object-fit:cover;border-radius:5px;cursor:pointer;border:2px solid ${i===fi?'var(--kth-blue)':'var(--border)'}" onclick="viewFoto('${vid}','${eid}',${i})"/>`).join('')}</div>`:''}
+    <img class="lightbox-img" src="${src}"/>
+    ${e.fotos.length>1?`<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">${e.fotos.map((x,i)=>`<img src="${x.url||x.dataUrl||''}" style="width:60px;height:46px;object-fit:cover;border-radius:5px;cursor:pointer;border:2px solid ${i===fi?'var(--kth-blue)':'var(--border)'}" onclick="viewFoto('${vid}','${eid}',${i})"/>`).join('')}</div>`:''}
     <div class="modal-btns"><button class="btn-modal-cancel" onclick="closeModal()">Schließen</button></div>`;
   document.getElementById('modalWrap').style.display='block';
 }
@@ -924,14 +1004,23 @@ async function saveEntry(vid,type){
   const dat=document.getElementById('m_dat')?.value;
   if(!dat){showToast('Bitte Datum angeben.','err-toast');return;}
   const v=data.find(x=>x.id===vid);
-  let e={id:uid(),datum:dat};
+  const eid=uid();
+  let e={id:eid,datum:dat};
+
   if(type==='wartungen'){
     const art=document.getElementById('m_art')?.value.trim();
     if(!art){showToast('Bitte Art der Wartung angeben.','err-toast');return;}
     const fileInput=document.getElementById('m_docs');
     const docFiles=fileInput?Array.from(fileInput.files).slice(0,3):[];
     let dokumente=[];
-    if(docFiles.length>0){showToast('Dokumente werden verarbeitet …');dokumente=await Promise.all(docFiles.map(compressFile));}
+    if(docFiles.length>0){
+      showToast('Dokumente werden hochgeladen …');
+      dokumente=await Promise.all(docFiles.map(f=>{
+        const safe=f.name.replace(/[^a-z0-9._-]/gi,'_');
+        const base=`wartungen/${vid}/${eid}/${safe}`;
+        return f.type.startsWith('image/')?resizeAndUpload(f,base):uploadDoc(f,base);
+      }));
+    }
     e={...e,art,km:parseInt(document.getElementById('m_km')?.value)||0,kosten:parseFloat(document.getElementById('m_kos')?.value)||0,werkstatt:document.getElementById('m_wrk')?.value.trim()||'',notiz:document.getElementById('m_not')?.value.trim()||'',dokumente};
   } else if(type==='reifenwechsel'){
     e={...e,vonBis:document.getElementById('m_von')?.value||'',reifen:document.getElementById('m_rei')?.value.trim()||'',profiltiefe:document.getElementById('m_pro')?.value.trim()||'',km:parseInt(document.getElementById('m_km')?.value)||0,notiz:document.getElementById('m_not')?.value.trim()||''};
@@ -943,12 +1032,27 @@ async function saveEntry(vid,type){
     const fileInput=document.getElementById('m_fotos');
     const files=fileInput?Array.from(fileInput.files).slice(0,5):[];
     let fotos=[];
-    if(files.length>0){showToast('Fotos werden verarbeitet …');fotos=await Promise.all(files.map(resizeImage));}
+    if(files.length>0){
+      showToast('Fotos werden hochgeladen …');
+      fotos=await Promise.all(files.map((f,i)=>{
+        const safe=f.name.replace(/[^a-z0-9._-]/gi,'_');
+        const base=`unfaelle/${vid}/${eid}/${i}_${safe}`;
+        return resizeAndUpload(f,base);
+      }));
+    }
     e={...e,beschreibung:bes,schaden:parseFloat(document.getElementById('m_sch')?.value)||0,repariert:document.getElementById('m_sta')?.value==='1',fremdverschulden:document.getElementById('m_fre')?.value==='1',versicherungsfall:document.getElementById('m_ver')?.value==='1',notiz:document.getElementById('m_not')?.value.trim()||'',fotos};
   }
-  v[type].push(e);save(data);
-  document.getElementById('modalWrap').style.display='none';
-  renderDetail(vid);showToast('Eintrag gespeichert.','ok-toast');
+
+  v[type].push(e);
+  showToast('Wird gespeichert …');
+  const ok=await saveVehicle(v);
+  if(ok){
+    document.getElementById('modalWrap').style.display='none';
+    renderDetail(vid);
+    showToast('Eintrag gespeichert.','ok-toast');
+  } else {
+    v[type].pop();
+  }
 }
 
 // ── EXPORT / IMPORT ───────────────────────────────────────────────────────────
@@ -966,35 +1070,33 @@ function exportCSV(){
   a.download=`fuhrpark_katharinenhof_${today()}.csv`;a.click();
   showToast('Excel/CSV erstellt.','ok-toast');
 }
+
 function exportJSON(){
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download=`fuhrpark_backup_${today()}.json`;a.click();
   showToast('JSON-Backup erstellt.','ok-toast');
 }
-function exportTermine(){
-  const termine=data.map(v=>({
-    kennzeichen:v.kennzeichen,
-    marke:v.marke,
-    modell:v.modell,
-    naechsterTuev:v.naechsterTuev||'',
-    naechsteWerkstatt:v.naechsteWerkstatt||''
-  }));
-  const blob=new Blob([JSON.stringify(termine,null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download='termine.json';a.click();
-  showToast('termine.json exportiert — bitte in GitHub-Repo committen.','ok-toast');
-}
-function importJSON(e){
-  const f=e.target.files[0];if(!f) return;
+
+async function importJSON(ev){
+  const f=ev.target.files[0];if(!f) return;
   const r=new FileReader();
-  r.onload=ev=>{
+  r.onload=async e=>{
     try{
-      const d=JSON.parse(ev.target.result);
-      if(!Array.isArray(d)) throw new Error();
+      const d=JSON.parse(e.target.result);
+      if(!Array.isArray(d)) throw new Error('Keine gültige JSON-Liste.');
       if(!confirm(`${d.length} Fahrzeuge importieren? Aktuelle Daten werden überschrieben.`)) return;
-      data=d.map(normalize);save(data);renderDashboard();showToast(`${d.length} Fahrzeuge importiert.`,'ok-toast');
-    }catch{showToast('Import fehlgeschlagen — ungültige Datei.','err-toast');}
+      showToast('Import läuft …');
+      for(const v of data) await db.from('fahrzeuge').delete().eq('id',v.id);
+      const normalized=d.map(normalize);
+      for(const v of normalized){
+        if(!v.id) v.id=crypto.randomUUID();
+        await saveVehicle(v);
+      }
+      data=await loadFromDB();
+      renderDashboard();
+      showToast(`${d.length} Fahrzeuge importiert.`,'ok-toast');
+    }catch(err){showToast('Import fehlgeschlagen — '+err.message,'err-toast');}
   };
   r.readAsText(f);
 }
@@ -1040,7 +1142,6 @@ function showToast(msg,cls=''){
 </div>
 
 <style>
-/* ── CHATBOT ────────────────────────────────────────────────────────────── */
 #chatFab{position:fixed;bottom:82px;right:24px;z-index:9990;width:54px;height:54px;border-radius:50%;background:var(--kth-blue);border:none;cursor:pointer;box-shadow:0 4px 18px rgba(0,86,164,.38);display:flex;align-items:center;justify-content:center;transition:transform .15s,box-shadow .15s}
 #chatFab:hover{transform:scale(1.08);box-shadow:0 6px 24px rgba(0,86,164,.48)}
 #chatFab svg{width:24px;height:24px;color:white}
@@ -1098,10 +1199,7 @@ function chatToggle(){
   if(hasKey) setTimeout(()=>document.getElementById('chatInput')?.focus(),100);
 }
 
-function chatClose(){
-  chatOpen=false;
-  document.getElementById('chatPanel').style.display='none';
-}
+function chatClose(){chatOpen=false;document.getElementById('chatPanel').style.display='none';}
 
 function chatSaveKey(){
   const key=document.getElementById('chatApiKey').value.trim();
@@ -1204,14 +1302,15 @@ async function chatSend(){
     const answer=result.content?.[0]?.text||'(Keine Antwort erhalten)';
     chatHistory.push({role:'assistant',content:answer});
     chatAppend('bot',answer);
-  }catch(e){
+  }catch(err){
     const typing=document.getElementById('chatTypingDot');
     if(typing) typing.remove();
-    chatAppend('bot','Fehler: '+e.message+'\n\nBitte API-Key prüfen (Taste „Key ändern").');
+    chatAppend('bot','Fehler: '+err.message);
   }finally{
     input.disabled=false;
+    const btn=document.getElementById('chatSendBtn');
     if(btn) btn.disabled=false;
-    input.focus();
+    setTimeout(()=>input.focus(),50);
   }
 }
 </script>
