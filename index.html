@@ -809,15 +809,20 @@ async function doSave(id){
     naechsteWerkstatt:document.getElementById('f_werkstatt').value,
     notizen:document.getElementById('f_notiz').value.trim()
   };
-  if(id){
-    const idx=data.findIndex(x=>x.id===id);
-    data[idx]={...data[idx],...fields};
-    showToast('Wird gespeichert …');
-    if(await saveVehicle(data[idx])){showToast('Gespeichert.','ok-toast');showView('detail',id);}
-  } else {
-    const nv={id:crypto.randomUUID(),...fields,wartungen:[],reifenwechsel:[],reinigungen:[],unfaelle:[]};
-    showToast('Wird gespeichert …');
-    if(await saveVehicle(nv)){data.push(nv);showToast('Fahrzeug angelegt.','ok-toast');showView('detail',nv.id);}
+  try {
+    if(id){
+      const idx=data.findIndex(x=>x.id===id);
+      data[idx]={...data[idx],...fields};
+      showToast('Wird gespeichert …');
+      if(await saveVehicle(data[idx])){showToast('Gespeichert.','ok-toast');showView('detail',id);}
+    } else {
+      const nv={id:crypto.randomUUID(),...fields,wartungen:[],reifenwechsel:[],reinigungen:[],unfaelle:[]};
+      showToast('Wird gespeichert …');
+      if(await saveVehicle(nv)){data.push(nv);showToast('Fahrzeug angelegt.','ok-toast');showView('detail',nv.id);}
+    }
+  } catch(err){
+    showToast('Speicherfehler: '+err.message,'err-toast');
+    console.error('[doSave] Unerwarteter Fehler:', err);
   }
 }
 
