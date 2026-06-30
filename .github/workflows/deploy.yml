@@ -1,0 +1,12 @@
+name: Deploy to Netlify
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Netlify Deploy auslösen
+        run: curl -s -X POST "${{ secrets.NETLIFY_HOOK_URL }}"
