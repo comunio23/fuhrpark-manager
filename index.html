@@ -317,10 +317,10 @@ const SUPABASE_KEY = 'sb_publishable_f74dwOv__3vvbgEaBmjjVQ_1h2TnCn_';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
-const PW = 'kaTha14612';
-function checkPw() {
-  if (document.getElementById('pwInput').value === PW) {
-    sessionStorage.setItem('fp_auth','1');
+const AUTH_EMAIL = 'haensel.claudia@katharinenhof.net';
+async function checkPw() {
+  const {error} = await db.auth.signInWithPassword({email:AUTH_EMAIL,password:document.getElementById('pwInput').value});
+  if (!error) {
     document.getElementById('loginScreen').style.display='none';
     init();
   } else {
@@ -415,10 +415,12 @@ function showLoading(v){
   document.getElementById('loadingOverlay').style.display=v?'flex':'none';
 }
 
-if(sessionStorage.getItem('fp_auth')==='1'){
-  document.getElementById('loginScreen').style.display='none';
-  init();
-}
+db.auth.getSession().then(({data:{session}})=>{
+  if(session){
+    document.getElementById('loginScreen').style.display='none';
+    init();
+  }
+});
 
 // ── STORAGE LAYER ─────────────────────────────────────────────────────────────
 async function uploadToStorage(blob,path){
