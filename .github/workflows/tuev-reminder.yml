@@ -17,7 +17,7 @@ jobs:
           SUPABASE_KEY: sb_publishable_f74dwOv__3vvbgEaBmjjVQ_1h2TnCn_
         with:
           script: |
-            const url = `${process.env.SUPABASE_URL}/rest/v1/fahrzeuge?select=kennzeichen,marke,modell,naechsterTuev,naechsteWerkstatt`;
+            const url = `${process.env.SUPABASE_URL}/rest/v1/fahrzeuge?select=kennzeichen,marke,modell,naechster_tuev,naechste_werkstatt`;
             const res = await fetch(url, {
               headers: {
                 apikey: process.env.SUPABASE_KEY,
@@ -36,8 +36,8 @@ jobs:
 
             const alerts = [];
             for (const v of fahrzeuge) {
-              if (v.naechsterTuev) {
-                const [y, m] = v.naechsterTuev.split('-').map(Number);
+              if (v.naechster_tuev) {
+                const [y, m] = v.naechster_tuev.split('-').map(Number);
                 const lastDay = new Date(y, m, 0).getDate();
                 const d = new Date(y, m - 1, lastDay);
                 const days = Math.round((d - today) / 86400000);
@@ -46,11 +46,11 @@ jobs:
                   alerts.push(`• ${v.kennzeichen} (${v.marke} ${v.modell}): TÜV fällig ${mm}.${y} — noch ${days} Tag${days===1?'':'e'}`);
                 }
               }
-              if (v.naechsteWerkstatt) {
-                const d = new Date(v.naechsteWerkstatt);
+              if (v.naechste_werkstatt) {
+                const d = new Date(v.naechste_werkstatt);
                 const days = Math.round((d - today) / 86400000);
                 if (days >= 0 && days <= SCHWELLE_TAGE) {
-                  const [y2,m2,dd2] = v.naechsteWerkstatt.split('-');
+                  const [y2,m2,dd2] = v.naechste_werkstatt.split('-');
                   alerts.push(`• ${v.kennzeichen} (${v.marke} ${v.modell}): Werkstatt am ${dd2}.${m2}.${y2} — noch ${days} Tag${days===1?'':'e'}`);
                 }
               }
