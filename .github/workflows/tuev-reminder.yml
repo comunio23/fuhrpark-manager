@@ -14,7 +14,7 @@ jobs:
         id: check
         env:
           SUPABASE_URL: https://bembfesrfepsftragaeq.supabase.co
-          SUPABASE_KEY: sb_publishable_f74dwOv__3vvbgEaBmjjVQ_1h2TnCn_
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         with:
           script: |
             const url = `${process.env.SUPABASE_URL}/rest/v1/fahrzeuge?select=kennzeichen,marke,modell,naechster_tuev,naechste_werkstatt`;
