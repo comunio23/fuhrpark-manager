@@ -41,7 +41,7 @@ jobs:
                 const lastDay = new Date(y, m, 0).getDate();
                 const d = new Date(y, m - 1, lastDay);
                 const days = Math.round((d - today) / 86400000);
-                if (days >= 0 && days <= SCHWELLE_TAGE) {
+                if (days === SCHWELLE_TAGE) {
                   const mm = String(m).padStart(2,'0');
                   alerts.push(`• ${v.kennzeichen} (${v.marke} ${v.modell}): TÜV fällig ${mm}.${y} — noch ${days} Tag${days===1?'':'e'}`);
                 }
@@ -49,7 +49,7 @@ jobs:
               if (v.naechste_werkstatt) {
                 const d = new Date(v.naechste_werkstatt);
                 const days = Math.round((d - today) / 86400000);
-                if (days >= 0 && days <= SCHWELLE_TAGE) {
+                if (days === SCHWELLE_TAGE) {
                   const [y2,m2,dd2] = v.naechste_werkstatt.split('-');
                   alerts.push(`• ${v.kennzeichen} (${v.marke} ${v.modell}): Werkstatt am ${dd2}.${m2}.${y2} — noch ${days} Tag${days===1?'':'e'}`);
                 }
@@ -71,13 +71,13 @@ jobs:
           server_port: 465
           username: ${{ secrets.MAIL_USER }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "⚠️ Fuhrpark: Termine in den nächsten 40 Tagen"
+          subject: "⚠️ Fuhrpark: Termine in 40 Tagen fällig"
           to: haensel.claudia@katharinenhof.net
           from: Fuhrpark-Manager Katharinenhof
           body: |
             Guten Morgen,
 
-            folgende Fahrzeuge haben in den nächsten 40 Tagen anstehende Termine:
+            folgende Fahrzeuge haben in genau 40 Tagen einen anstehenden Termin:
 
             ${{ steps.check.outputs.message }}
 
