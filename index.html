@@ -581,7 +581,7 @@ function renderDashboard(){
     <div class="toolbar">
       <div class="search-wrap">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input type="text" placeholder="Suche: Kennzeichen, Marke, Modell …" value="${state.search}" oninput="state.search=this.value;renderDashboard()"/>
+        <input type="text" placeholder="Suche: Kennzeichen, Marke, Modell …" value="${escAttr(state.search)}" oninput="state.search=this.value;renderDashboard()"/>
       </div>
       <select onchange="state.filter=this.value;renderDashboard()">
         <option value="all" ${state.filter==='all'?'selected':''}>Alle Fahrzeuge</option>
@@ -618,8 +618,8 @@ function cardHtml(v){
   return `
     <div class="vehicle-card" onclick="showView('detail','${v.id}')">
       <div class="card-head">
-        <div class="card-kfz">${v.kennzeichen}</div>
-        <div class="card-model">${v.marke} ${v.modell}</div>
+        <div class="card-kfz">${esc(v.kennzeichen)}</div>
+        <div class="card-model">${esc(v.marke)} ${esc(v.modell)}</div>
         <div class="card-corner-badges">
           <span class="cbadge cbadge-${tc}">TÜV</span>
           ${offen>0?`<span class="cbadge cbadge-danger">Unfall offen</span>`:''}
@@ -628,9 +628,9 @@ function cardHtml(v){
       <div class="card-body">
         <div class="card-info-grid">
           <div class="ci"><span class="l">Erstzulassung</span><span class="v">${fmt(v.erstzulassung)}</span></div>
-          <div class="ci"><span class="l">Kraftstoff</span><span class="v">${v.kraftstoff||'—'}</span></div>
-          <div class="ci"><span class="l">Typ</span><span class="v">${v.typ}</span></div>
-          <div class="ci"><span class="l">Farbe</span><span class="v">${v.farbe||'—'}</span></div>
+          <div class="ci"><span class="l">Kraftstoff</span><span class="v">${esc(v.kraftstoff)||'—'}</span></div>
+          <div class="ci"><span class="l">Typ</span><span class="v">${esc(v.typ)}</span></div>
+          <div class="ci"><span class="l">Farbe</span><span class="v">${esc(v.farbe)||'—'}</span></div>
         </div>
         <div class="card-km-row">
           <span class="card-km-val">${lkm?lkm.km.toLocaleString('de-DE'):v.kilometerstand.toLocaleString('de-DE')} km</span>
@@ -660,18 +660,18 @@ function renderDetail(id){
     <div class="detail-top">
       <button class="back-btn" onclick="showView('dashboard')">← Zurück zur Übersicht</button>
       <div class="detail-heading">
-        <div class="detail-kfz">${v.kennzeichen}</div>
-        <div class="detail-sub">${v.marke} ${v.modell} · ${v.farbe||''} · ${v.typ} · ${v.kraftstoff||''}</div>
+        <div class="detail-kfz">${esc(v.kennzeichen)}</div>
+        <div class="detail-sub">${esc(v.marke)} ${esc(v.modell)} · ${esc(v.farbe)} · ${esc(v.typ)} · ${esc(v.kraftstoff)}</div>
       </div>
       <button class="btn-edit" onclick="showForm('${v.id}')">✎ Bearbeiten</button>
     </div>
     <div class="info-cards">
       <div class="icard"><div class="l">Erstzulassung</div><div class="v">${fmt(v.erstzulassung)}</div></div>
       <div class="icard"><div class="l">Letzter KM-Stand</div><div class="v">${lkm?lkm.km.toLocaleString('de-DE'):v.kilometerstand.toLocaleString('de-DE')} km<small>${lkm?`${lkm.quelle}, ${fmt(lkm.datum)}`:'manuell eingetragen'}</small></div></div>
-      <div class="icard"><div class="l">Kraftstoff</div><div class="v">${v.kraftstoff||'—'}</div></div>
+      <div class="icard"><div class="l">Kraftstoff</div><div class="v">${esc(v.kraftstoff)||'—'}</div></div>
       <div class="icard full"><div class="l">Nächster TÜV</div>
         <div class="v ${tc}-color">${fmt(v.naechsterTuev)}<small>${td===null?'nicht eingetragen':td<0?`ÜBERFÄLLIG (${Math.abs(td)} Tage)`:td+' Tage verbleibend'}</small></div>
-        ${(v.tuevDokumente||[]).length>0?`<div class="dok-badges">${v.tuevDokumente.map((d,di)=>`<span class="dok-badge" onclick="viewTuevDokument('${v.id}',${di})">📎 ${d.name}</span>`).join('')}</div>`:''}
+        ${(v.tuevDokumente||[]).length>0?`<div class="dok-badges">${v.tuevDokumente.map((d,di)=>`<span class="dok-badge" onclick="viewTuevDokument('${v.id}',${di})">📎 ${esc(d.name)}</span>`).join('')}</div>`:''}
         <label class="btn-add" style="margin-top:9px;cursor:pointer;display:inline-flex;width:fit-content">
           + TÜV-Bericht hochladen
           <input type="file" accept="image/*,.pdf" multiple style="display:none" onchange="uploadTuevDoc('${v.id}',event)"/>
@@ -681,19 +681,19 @@ function renderDetail(id){
       <div class="icard"><div class="l">Nächste Werkstatt</div>
         <div class="v ${wc}-color">${fmt(v.naechsteWerkstatt)}<small>${wd===null?'nicht eingetragen':wd<0?`ÜBERFÄLLIG (${Math.abs(wd)} Tage)`:wd+' Tage verbleibend'}</small></div>
       </div>
-      ${v.notizen?`<div class="icard full"><div class="l">Notizen</div><div class="v" style="font-size:.9rem;font-weight:400">${v.notizen}</div></div>`:''}
+      ${v.notizen?`<div class="icard full"><div class="l">Notizen</div><div class="v" style="font-size:.9rem;font-weight:400">${esc(v.notizen)}</div></div>`:''}
     </div>
     ${section(v,'wartungen','🔧 Wartungen & Werkstatt',
       (v.wartungen||[]).sort((a,b)=>b.datum.localeCompare(a.datum)).map(e=>`
         <div class="erow"><span class="edate">${fmt(e.datum)}</span>
-          <div class="econtent"><div class="etitle">${e.art}</div>
+          <div class="econtent"><div class="etitle">${esc(e.art)}</div>
             <div class="emeta">
               ${e.km?`<span>📍 ${e.km.toLocaleString('de-DE')} km</span>`:''}
               ${e.kosten?`<span>💶 ${e.kosten} €</span>`:''}
-              ${e.werkstatt?`<span>🏭 ${e.werkstatt}</span>`:''}
+              ${e.werkstatt?`<span>🏭 ${esc(e.werkstatt)}</span>`:''}
             </div>
-            ${e.notiz?`<div class="enote">${e.notiz}</div>`:''}
-            ${e.dokumente&&e.dokumente.length>0?`<div class="dok-badges">${e.dokumente.map((d,di)=>`<span class="dok-badge" onclick="viewDokument('${v.id}','wartungen','${e.id}',${di})">📎 ${d.name}</span>`).join('')}</div>`:''}
+            ${e.notiz?`<div class="enote">${esc(e.notiz)}</div>`:''}
+            ${e.dokumente&&e.dokumente.length>0?`<div class="dok-badges">${e.dokumente.map((d,di)=>`<span class="dok-badge" onclick="viewDokument('${v.id}','wartungen','${e.id}',${di})">📎 ${esc(d.name)}</span>`).join('')}</div>`:''}
           </div>
           <div class="erow-actions">
             <button class="edel eedit" onclick="editEntry('${v.id}','wartungen','${e.id}')" title="Bearbeiten">✎</button>
@@ -704,12 +704,12 @@ function renderDetail(id){
     ${section(v,'reifenwechsel','🔄 Reifenwechsel',
       (v.reifenwechsel||[]).sort((a,b)=>b.datum.localeCompare(a.datum)).map(e=>`
         <div class="erow"><span class="edate">${fmt(e.datum)}</span>
-          <div class="econtent"><div class="etitle">${e.vonBis}</div>
+          <div class="econtent"><div class="etitle">${esc(e.vonBis)}</div>
             <div class="emeta">
-              ${e.reifen?`<span>🔘 ${e.reifen}</span>`:''}
-              ${e.profiltiefe?`<span>📏 ${e.profiltiefe}</span>`:''}
+              ${e.reifen?`<span>🔘 ${esc(e.reifen)}</span>`:''}
+              ${e.profiltiefe?`<span>📏 ${esc(e.profiltiefe)}</span>`:''}
               ${e.km?`<span>📍 ${e.km.toLocaleString('de-DE')} km</span>`:''}
-            </div>${e.notiz?`<div class="enote">${e.notiz}</div>`:''}
+            </div>${e.notiz?`<div class="enote">${esc(e.notiz)}</div>`:''}
           </div>
           <div class="erow-actions">
             <button class="edel eedit" onclick="editEntry('${v.id}','reifenwechsel','${e.id}')" title="Bearbeiten">✎</button>
@@ -720,9 +720,9 @@ function renderDetail(id){
     ${section(v,'reinigungen','🧹 Reinigung & Desinfektion',
       (v.reinigungen||[]).sort((a,b)=>b.datum.localeCompare(a.datum)).map(e=>`
         <div class="erow"><span class="edate">${fmt(e.datum)}</span>
-          <div class="econtent"><div class="etitle">${e.art}</div>
-            <div class="emeta">${e.durchgefuehrt?`<span>👤 ${e.durchgefuehrt}</span>`:''}</div>
-            ${e.notiz?`<div class="enote">${e.notiz}</div>`:''}
+          <div class="econtent"><div class="etitle">${esc(e.art)}</div>
+            <div class="emeta">${e.durchgefuehrt?`<span>👤 ${esc(e.durchgefuehrt)}</span>`:''}</div>
+            ${e.notiz?`<div class="enote">${esc(e.notiz)}</div>`:''}
           </div>
           <div class="erow-actions">
             <button class="edel eedit" onclick="editEntry('${v.id}','reinigungen','${e.id}')" title="Bearbeiten">✎</button>
@@ -733,16 +733,16 @@ function renderDetail(id){
     ${section(v,'unfaelle','⚠️ Unfalldokumentation',
       (v.unfaelle||[]).sort((a,b)=>b.datum.localeCompare(a.datum)).map(e=>`
         <div class="erow"><span class="edate">${fmt(e.datum)}</span>
-          <div class="econtent"><div class="etitle">${e.beschreibung}</div>
+          <div class="econtent"><div class="etitle">${esc(e.beschreibung)}</div>
             <div class="emeta">
               ${e.schaden?`<span>💶 ca. ${e.schaden} €</span>`:''}
               <span>${e.fremdverschulden?'Fremdverschulden':'Eigenverschulden'}</span>
               ${e.versicherungsfall?`<span>Versicherungsfall</span>`:''}
             </div>
             <span class="apill ${e.repariert?'apill-ok':'apill-open'}">${e.repariert?'✓ Repariert':'⚠ Noch offen'}</span>
-            ${e.notiz?`<div class="enote">${e.notiz}</div>`:''}
+            ${e.notiz?`<div class="enote">${esc(e.notiz)}</div>`:''}
             ${e.fotos&&e.fotos.length>0?`
-              <div class="foto-row">${e.fotos.map((f,fi)=>`<img class="foto-thumb" src="${f.url||f.dataUrl||''}" title="${f.name}" onclick="viewFoto('${v.id}','${e.id}',${fi})"/>`).join('')}</div>
+              <div class="foto-row">${e.fotos.map((f,fi)=>`<img class="foto-thumb" src="${f.url||f.dataUrl||''}" title="${esc(f.name)}" onclick="viewFoto('${v.id}','${e.id}',${fi})"/>`).join('')}</div>
               <div class="foto-count">📷 ${e.fotos.length} Foto${e.fotos.length>1?'s':''} gespeichert</div>`
               :'<div class="foto-count" style="color:var(--text-soft)">Keine Fotos hochgeladen</div>'
             }
@@ -769,23 +769,23 @@ function renderForm(id){
       <button class="back-btn" onclick="showView(${v?`'detail','${v.id}'`:"'dashboard'"})">← Zurück</button>
       <div class="detail-heading">
         <div class="detail-kfz">${v?'Fahrzeug bearbeiten':'Neues Fahrzeug anlegen'}</div>
-        ${v?`<div class="detail-sub">${v.kennzeichen} · ${v.marke} ${v.modell}</div>`:''}
+        ${v?`<div class="detail-sub">${esc(v.kennzeichen)} · ${esc(v.marke)} ${esc(v.modell)}</div>`:''}
       </div>
     </div>
     <div class="form-wrap"><div class="form-card">
       <div class="fsection-title">Kennzeichen &amp; Fahrzeugtyp</div>
       <div class="frow">
-        <div class="field"><label>Kennzeichen *</label><input id="f_kfz" value="${v?.kennzeichen||''}" placeholder="z.B. PM-KTH 10"/></div>
+        <div class="field"><label>Kennzeichen *</label><input id="f_kfz" value="${escAttr(v?.kennzeichen)}" placeholder="z.B. PM-KTH 10"/></div>
         <div class="field"><label>Fahrzeugtyp</label>
           <select id="f_typ">${['PKW','PKW-Kombi','Transporter','LKW','Motorrad','Anhänger','Sonstiges'].map(t=>`<option${v?.typ===t?' selected':''}>${t}</option>`).join('')}</select>
         </div>
       </div>
       <div class="frow">
-        <div class="field"><label>Marke *</label><input id="f_marke" value="${v?.marke||''}" placeholder="z.B. Volkswagen"/></div>
-        <div class="field"><label>Modell *</label><input id="f_modell" value="${v?.modell||''}" placeholder="z.B. Caddy Maxi"/></div>
+        <div class="field"><label>Marke *</label><input id="f_marke" value="${escAttr(v?.marke)}" placeholder="z.B. Volkswagen"/></div>
+        <div class="field"><label>Modell *</label><input id="f_modell" value="${escAttr(v?.modell)}" placeholder="z.B. Caddy Maxi"/></div>
       </div>
       <div class="frow">
-        <div class="field"><label>Farbe</label><input id="f_farbe" value="${v?.farbe||''}" placeholder="z.B. Perlweiß"/></div>
+        <div class="field"><label>Farbe</label><input id="f_farbe" value="${escAttr(v?.farbe)}" placeholder="z.B. Perlweiß"/></div>
         <div class="field"><label>Kraftstoff</label>
           <select id="f_kraft">${['Diesel','Benzin','Elektro','Hybrid','Erdgas/Benzin (CNG)','LPG / Autogas','Wasserstoff','Sonstiges'].map(k=>`<option${v?.kraftstoff===k?' selected':''}>${k}</option>`).join('')}</select>
         </div>
@@ -807,7 +807,7 @@ function renderForm(id){
         <div class="field"><label>Nächste Werkstatt (genaues Datum)</label><input type="date" id="f_werkstatt" value="${v?.naechsteWerkstatt||''}"/></div>
       </div>
       <div class="frow one">
-        <div class="field"><label>Notizen</label><textarea id="f_notiz" placeholder="Besonderheiten zum Fahrzeug …">${v?.notizen||''}</textarea></div>
+        <div class="field"><label>Notizen</label><textarea id="f_notiz" placeholder="Besonderheiten zum Fahrzeug …">${esc(v?.notizen)}</textarea></div>
       </div>
       <div class="form-btns">
         <button class="btn-save" onclick="doSave('${v?.id||''}')">💾 Speichern</button>
@@ -824,6 +824,8 @@ async function doSave(id){
   const marke=document.getElementById('f_marke').value.trim();
   const modell=document.getElementById('f_modell').value.trim();
   if(!kfz||!marke||!modell){showToast('Bitte Kennzeichen, Marke und Modell ausfüllen.','err-toast');return;}
+  const dupe=data.find(x=>x.id!==id&&x.kennzeichen.trim().toLowerCase()===kfz.toLowerCase());
+  if(dupe){showToast(`Kennzeichen "${kfz}" ist bereits vergeben (${dupe.marke} ${dupe.modell}).`,'err-toast');return;}
   const fields={
     kennzeichen:kfz,marke,modell,
     farbe:document.getElementById('f_farbe').value.trim(),
@@ -842,7 +844,7 @@ async function doSave(id){
       showToast('Wird gespeichert …');
       if(await saveVehicle(data[idx])){showToast('Gespeichert.','ok-toast');showView('detail',id);}
     } else {
-      const nv={id:crypto.randomUUID(),...fields,wartungen:[],reifenwechsel:[],reinigungen:[],unfaelle:[]};
+      const nv={id:crypto.randomUUID(),...fields,tuevDokumente:[],wartungen:[],reifenwechsel:[],reinigungen:[],unfaelle:[]};
       showToast('Wird gespeichert …');
       if(await saveVehicle(nv)){data.push(nv);showToast('Fahrzeug angelegt.','ok-toast');showView('detail',nv.id);}
     }
@@ -873,7 +875,8 @@ async function delEntry(vid,type,eid){
 }
 
 // ── MODALS ────────────────────────────────────────────────────────────────────
-function escAttr(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+function escAttr(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+const esc=escAttr; // gleiche Funktion, für Text- wie Attribut-Kontext sicher (Über-Escaping ist unschädlich)
 function selOpt(val,current){return String(val)===String(current)?' selected':'';}
 
 function editEntry(vid,type,eid){openModal(vid,type,eid);}
@@ -898,7 +901,7 @@ function openModal(vid,type,eid=null){
       <div class="mfield"><label>Notiz</label><textarea id="m_not" rows="2">${escAttr(entry?.notiz)}</textarea></div>
       <div class="mfield">
         <label>Dokumente anhängen (TÜV-Bericht, Rechnung)</label>
-        ${existingDocs.length?`<div class="dok-badges">${existingDocs.map(d=>`<span class="dok-badge">📎 ${d.name}</span>`).join('')}</div><div class="foto-hinweis">Vorhandene Dokumente bleiben erhalten. Neue Auswahl ergänzt weitere.</div>`:''}
+        ${existingDocs.length?`<div class="dok-badges">${existingDocs.map(d=>`<span class="dok-badge">📎 ${esc(d.name)}</span>`).join('')}</div><div class="foto-hinweis">Vorhandene Dokumente bleiben erhalten. Neue Auswahl ergänzt weitere.</div>`:''}
         <input type="file" id="m_docs" accept="image/*,.pdf" multiple onchange="previewDokumente()"/>
         <div class="foto-hinweis">JPG / PNG werden komprimiert · PDF direkt gespeichert · max. 3 Dateien</div>
         <div class="foto-preview" id="dokPreview"></div>
@@ -1008,12 +1011,12 @@ function viewDokument(vid,type,eid,idx){
   if(!dok) return;
   const src=dok.url||dok.dataUrl||'';
   document.getElementById('modalBox').innerHTML=`
-    <h2>📎 ${dok.name}</h2>
+    <h2>📎 ${esc(dok.name)}</h2>
     ${dok.isPdf
-      ?`<div style="padding:20px;text-align:center;background:var(--bg);border-radius:8px;margin-top:8px"><div style="font-size:.85rem;color:var(--text-soft);margin-bottom:12px">PDF öffnen oder herunterladen</div><a href="${src}" target="_blank" rel="noopener" style="background:var(--kth-blue);color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:700">⬇ PDF öffnen</a></div>`
-      :`<img class="lightbox-img" src="${src}"/>`}
+      ?`<div style="padding:20px;text-align:center;background:var(--bg);border-radius:8px;margin-top:8px"><div style="font-size:.85rem;color:var(--text-soft);margin-bottom:12px">PDF öffnen oder herunterladen</div><a href="${escAttr(src)}" target="_blank" rel="noopener" style="background:var(--kth-blue);color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:700">⬇ PDF öffnen</a></div>`
+      :`<img class="lightbox-img" src="${escAttr(src)}"/>`}
     <div class="modal-btns">
-      <a href="${src}" download="${dok.name}" class="btn-modal-cancel">⬇ Herunterladen</a>
+      <a href="${escAttr(src)}" download="${escAttr(dok.name)}" class="btn-modal-cancel">⬇ Herunterladen</a>
       <button class="btn-modal-cancel" onclick="closeModal()">Schließen</button>
     </div>`;
   document.getElementById('modalWrap').style.display='block';
@@ -1026,9 +1029,9 @@ function viewFoto(vid,eid,fi){
   if(!f) return;
   const src=f.url||f.dataUrl||'';
   document.getElementById('modalBox').innerHTML=`
-    <h2>📷 Unfallfotos — ${v.kennzeichen}</h2>
-    <img class="lightbox-img" src="${src}"/>
-    ${e.fotos.length>1?`<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">${e.fotos.map((x,i)=>`<img src="${x.url||x.dataUrl||''}" style="width:60px;height:46px;object-fit:cover;border-radius:5px;cursor:pointer;border:2px solid ${i===fi?'var(--kth-blue)':'var(--border)'}" onclick="viewFoto('${vid}','${eid}',${i})"/>`).join('')}</div>`:''}
+    <h2>📷 Unfallfotos — ${esc(v.kennzeichen)}</h2>
+    <img class="lightbox-img" src="${escAttr(src)}"/>
+    ${e.fotos.length>1?`<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">${e.fotos.map((x,i)=>`<img src="${escAttr(x.url||x.dataUrl||'')}" style="width:60px;height:46px;object-fit:cover;border-radius:5px;cursor:pointer;border:2px solid ${i===fi?'var(--kth-blue)':'var(--border)'}" onclick="viewFoto('${vid}','${eid}',${i})"/>`).join('')}</div>`:''}
     <div class="modal-btns"><button class="btn-modal-cancel" onclick="closeModal()">Schließen</button></div>`;
   document.getElementById('modalWrap').style.display='block';
 }
@@ -1041,16 +1044,19 @@ async function uploadTuevDoc(vid,ev){
   const hint=document.getElementById('tuevUploadHint_'+vid);
   if(hint) hint.style.display='block';
   showToast('TÜV-Bericht wird hochgeladen …');
+  const vorher=[...(v.tuevDokumente||[])];
   try{
     const neu=await Promise.all(files.map((f,i)=>{
       const safe=f.name.replace(/[^a-z0-9._-]/gi,'_');
       const base=`tuev/${vid}/${uid()}_${i}_${safe}`;
       return f.type.startsWith('image/')?resizeAndUpload(f,base):uploadDoc(f,base);
     }));
-    v.tuevDokumente=[...(v.tuevDokumente||[]),...neu];
+    v.tuevDokumente=[...vorher,...neu];
     const ok=await saveVehicle(v);
     if(ok){renderDetail(vid);showToast('TÜV-Bericht gespeichert.','ok-toast');}
+    else{v.tuevDokumente=vorher;}
   }catch(err){
+    v.tuevDokumente=vorher;
     showToast('Upload fehlgeschlagen: '+err.message,'err-toast');
   }finally{
     if(hint) hint.style.display='none';
@@ -1064,12 +1070,12 @@ function viewTuevDokument(vid,idx){
   if(!dok) return;
   const src=dok.url||dok.dataUrl||'';
   document.getElementById('modalBox').innerHTML=`
-    <h2>📎 ${dok.name}</h2>
+    <h2>📎 ${esc(dok.name)}</h2>
     ${dok.isPdf
-      ?`<div style="padding:20px;text-align:center;background:var(--bg);border-radius:8px;margin-top:8px"><div style="font-size:.85rem;color:var(--text-soft);margin-bottom:12px">PDF öffnen oder herunterladen</div><a href="${src}" target="_blank" rel="noopener" style="background:var(--kth-blue);color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:700">⬇ PDF öffnen</a></div>`
-      :`<img class="lightbox-img" src="${src}"/>`}
+      ?`<div style="padding:20px;text-align:center;background:var(--bg);border-radius:8px;margin-top:8px"><div style="font-size:.85rem;color:var(--text-soft);margin-bottom:12px">PDF öffnen oder herunterladen</div><a href="${escAttr(src)}" target="_blank" rel="noopener" style="background:var(--kth-blue);color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:700">⬇ PDF öffnen</a></div>`
+      :`<img class="lightbox-img" src="${escAttr(src)}"/>`}
     <div class="modal-btns">
-      <a href="${src}" download="${dok.name}" class="btn-modal-cancel">⬇ Herunterladen</a>
+      <a href="${escAttr(src)}" download="${escAttr(dok.name)}" class="btn-modal-cancel">⬇ Herunterladen</a>
       <button class="btn-modal-cancel" style="border-color:var(--danger-border);color:var(--danger)" onclick="delTuevDokument('${vid}',${idx})">🗑 Löschen</button>
       <button class="btn-modal-cancel" onclick="closeModal()">Schließen</button>
     </div>`;
@@ -1156,14 +1162,20 @@ async function saveEntry(vid,type,editId=null){
 
 // ── EXPORT / IMPORT ───────────────────────────────────────────────────────────
 function exportCSV(){
-  const esc=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
+  // Schutz vor CSV-Formel-Injection: Zellen, die mit =, +, -, @ beginnen, würden
+  // Excel/LibreOffice sonst als Formel interpretieren — daher führendes ' voranstellen.
+  const csvCell=s=>{
+    let v=String(s==null?'':s);
+    if(/^[=+\-@]/.test(v)) v="'"+v;
+    return '"'+v.replace(/"/g,'""')+'"';
+  };
   const headers=['Kennzeichen','Marke','Modell','Typ','Farbe','Kraftstoff','Erstzulassung','Kilometerstand','Letzter KM (Quelle)','Letzter KM Datum','TÜV fällig','Werkstatt fällig','TÜV Status','Wartungen','Reifenwechsel','Reinigungen','Unfälle','Notizen'];
   const statusText=s=>{const d=daysTo(s);if(d===null)return'nicht eingetragen';if(d<0)return'ÜBERFÄLLIG';if(d<=30)return'Kritisch';if(d<=90)return'Bald fällig';return'OK';};
   const rows=data.map(v=>{
     const lkm=getLastKm(v);
     return[v.kennzeichen,v.marke,v.modell,v.typ,v.farbe||'',v.kraftstoff||'',fmt(v.erstzulassung),v.kilometerstand,lkm?lkm.quelle:'',lkm?fmt(lkm.datum):'',fmt(v.naechsterTuev),fmt(v.naechsteWerkstatt),statusText(v.naechsterTuev),(v.wartungen||[]).length,(v.reifenwechsel||[]).length,(v.reinigungen||[]).length,(v.unfaelle||[]).length,v.notizen||''];
   });
-  const csv=[headers,...rows].map(r=>r.map(esc).join(';')).join('\r\n');
+  const csv=[headers,...rows].map(r=>r.map(csvCell).join(';')).join('\r\n');
   const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download=`fuhrpark_katharinenhof_${today()}.csv`;a.click();
@@ -1184,13 +1196,29 @@ async function importJSON(ev){
     try{
       const d=JSON.parse(e.target.result);
       if(!Array.isArray(d)) throw new Error('Keine gültige JSON-Liste.');
-      if(!confirm(`${d.length} Fahrzeuge importieren? Aktuelle Daten werden überschrieben.`)) return;
+      const invalid=d.find(v=>!v||typeof v!=='object'||!String(v.kennzeichen||'').trim()||!String(v.marke||'').trim()||!String(v.modell||'').trim());
+      if(invalid) throw new Error('Mindestens ein Eintrag hat kein Kennzeichen/Marke/Modell — Import abgebrochen, es wurde nichts verändert.');
+      if(!confirm(`${d.length} Fahrzeuge importieren? Aktuelle Daten werden ersetzt.`)) return;
       showToast('Import läuft …');
-      for(const v of data) await db.from('fahrzeuge').delete().eq('id',v.id);
+      // Reihenfolge bewusst so gewählt, dass bei einem Fehler mittendrin NIE alle
+      // Daten weg sind: erst werden die neuen Fahrzeuge gespeichert, ERST DANACH
+      // werden alte, nicht mehr enthaltene Fahrzeuge (inkl. ihrer Dateien) entfernt.
       const normalized=d.map(normalize);
+      const neueIds=new Set();
       for(const v of normalized){
         if(!v.id) v.id=crypto.randomUUID();
-        await saveVehicle(v);
+        neueIds.add(v.id);
+        const ok=await saveVehicle(v);
+        if(!ok) throw new Error(`Speichern von "${v.kennzeichen}" fehlgeschlagen — Import abgebrochen. Bereits verarbeitete Fahrzeuge wurden übernommen, ältere Fahrzeuge wurden NICHT gelöscht.`);
+      }
+      const alte=data.filter(v=>!neueIds.has(v.id));
+      for(const v of alte){
+        const paths=[];
+        (v.unfaelle||[]).forEach(u=>(u.fotos||[]).forEach(ft=>ft.path&&paths.push(ft.path)));
+        (v.wartungen||[]).forEach(w=>(w.dokumente||[]).forEach(dk=>dk.path&&paths.push(dk.path)));
+        (v.tuevDokumente||[]).forEach(dk=>dk.path&&paths.push(dk.path));
+        await removeStoragePaths(paths);
+        await db.from('fahrzeuge').delete().eq('id',v.id);
       }
       data=await loadFromDB();
       renderDashboard();
