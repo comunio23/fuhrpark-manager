@@ -165,8 +165,10 @@ main{max-width:1500px;margin:0 auto;padding:32px 24px}
 .etitle{font-size:.92rem;font-weight:700;color:var(--text);margin-bottom:3px}
 .emeta{font-size:.78rem;color:var(--text-soft);display:flex;gap:12px;flex-wrap:wrap}
 .enote{font-size:.8rem;color:var(--text-soft);font-style:italic;margin-top:4px}
+.erow-actions{display:flex;gap:2px;flex-shrink:0}
 .edel{background:none;border:none;cursor:pointer;color:var(--text-soft);padding:4px 6px;border-radius:6px;transition:.15s;flex-shrink:0;font-size:1rem;line-height:1}
 .edel:hover{background:var(--danger-bg);color:var(--danger)}
+.eedit:hover{background:var(--kth-blue-bg);color:var(--kth-blue)}
 .empty-list{padding:22px 20px;font-size:.85rem;color:var(--text-soft);text-align:center;font-style:italic}
 .apill{display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:10px;margin-top:5px}
 .apill-ok{background:var(--ok-bg);color:var(--ok)}
@@ -354,6 +356,7 @@ async function loadFromDB(){
     naechsterTuev:row.naechster_tuev||'',
     naechsteWerkstatt:row.naechste_werkstatt||'',
     notizen:row.notizen||'',
+    tuevDokumente:row.tuev_dokumente||[],
     wartungen:(row.wartungen||[]).map(w=>({dokumente:[],...w})),
     reifenwechsel:row.reifenwechsel||[],
     reinigungen:row.reinigungen||[],
@@ -375,6 +378,7 @@ async function saveVehicle(v){
     naechster_tuev:v.naechsterTuev,
     naechste_werkstatt:v.naechsteWerkstatt,
     notizen:v.notizen,
+    tuev_dokumente:v.tuevDokumente,
     wartungen:v.wartungen,
     reifenwechsel:v.reifenwechsel,
     reinigungen:v.reinigungen,
@@ -395,6 +399,7 @@ async function deleteVehicleDB(id){
     const paths=[];
     (v.unfaelle||[]).forEach(u=>(u.fotos||[]).forEach(f=>f.path&&paths.push(f.path)));
     (v.wartungen||[]).forEach(w=>(w.dokumente||[]).forEach(d=>d.path&&paths.push(d.path)));
+    (v.tuevDokumente||[]).forEach(d=>d.path&&paths.push(d.path));
     await removeStoragePaths(paths);
   }
   const {error}=await db.from('fahrzeuge').delete().eq('id',id);
@@ -470,6 +475,7 @@ function normalize(v){
   v.reifenwechsel=v.reifenwechsel||[];
   v.reinigungen=v.reinigungen||[];
   v.unfaelle=v.unfaelle||[];
+  v.tuevDokumente=v.tuevDokumente||[];
   return v;
 }
 
@@ -663,8 +669,14 @@ function renderDetail(id){
       <div class="icard"><div class="l">Erstzulassung</div><div class="v">${fmt(v.erstzulassung)}</div></div>
       <div class="icard"><div class="l">Letzter KM-Stand</div><div class="v">${lkm?lkm.km.toLocaleString('de-DE'):v.kilometerstand.toLocaleString('de-DE')} km<small>${lkm?`${lkm.quelle}, ${fmt(lkm.datum)}`:'manuell eingetragen'}</small></div></div>
       <div class="icard"><div class="l">Kraftstoff</div><div class="v">${v.kraftstoff||'—'}</div></div>
-      <div class="icard"><div class="l">Nächster TÜV</div>
+      <div class="icard full"><div class="l">Nächster TÜV</div>
         <div class="v ${tc}-color">${fmt(v.naechsterTuev)}<small>${td===null?'nicht eingetragen':td<0?`ÜBERFÄLLIG (${Math.abs(td)} Tage)`:td+' Tage verbleibend'}</small></div>
+        ${(v.tuevDokumente||[]).length>0?`<div class="dok-badges">${v.tuevDokumente.map((d,di)=>`<span class="dok-badge" onclick="viewTuevDokument('${v.id}',${di})">📎 ${d.name}</span>`).join('')}</div>`:''}
+        <label class="btn-add" style="margin-top:9px;cursor:pointer;display:inline-flex;width:fit-content">
+          + TÜV-Bericht hochladen
+          <input type="file" accept="image/*,.pdf" multiple style="display:none" onchange="uploadTuevDoc('${v.id}',event)"/>
+        </label>
+        <div id="tuevUploadHint_${v.id}" class="foto-hinweis" style="display:none">Wird hochgeladen …</div>
       </div>
       <div class="icard"><div class="l">Nächste Werkstatt</div>
         <div class="v ${wc}-color">${fmt(v.naechsteWerkstatt)}<small>${wd===null?'nicht eingetragen':wd<0?`ÜBERFÄLLIG (${Math.abs(wd)} Tage)`:wd+' Tage verbleibend'}</small></div>
@@ -683,7 +695,10 @@ function renderDetail(id){
             ${e.notiz?`<div class="enote">${e.notiz}</div>`:''}
             ${e.dokumente&&e.dokumente.length>0?`<div class="dok-badges">${e.dokumente.map((d,di)=>`<span class="dok-badge" onclick="viewDokument('${v.id}','wartungen','${e.id}',${di})">📎 ${d.name}</span>`).join('')}</div>`:''}
           </div>
-          <button class="edel" onclick="delEntry('${v.id}','wartungen','${e.id}')" title="Löschen">✕</button>
+          <div class="erow-actions">
+            <button class="edel eedit" onclick="editEntry('${v.id}','wartungen','${e.id}')" title="Bearbeiten">✎</button>
+            <button class="edel" onclick="delEntry('${v.id}','wartungen','${e.id}')" title="Löschen">✕</button>
+          </div>
         </div>`).join('')||'<div class="empty-list">Noch keine Wartungseinträge.</div>'
     )}
     ${section(v,'reifenwechsel','🔄 Reifenwechsel',
@@ -696,7 +711,10 @@ function renderDetail(id){
               ${e.km?`<span>📍 ${e.km.toLocaleString('de-DE')} km</span>`:''}
             </div>${e.notiz?`<div class="enote">${e.notiz}</div>`:''}
           </div>
-          <button class="edel" onclick="delEntry('${v.id}','reifenwechsel','${e.id}')" title="Löschen">✕</button>
+          <div class="erow-actions">
+            <button class="edel eedit" onclick="editEntry('${v.id}','reifenwechsel','${e.id}')" title="Bearbeiten">✎</button>
+            <button class="edel" onclick="delEntry('${v.id}','reifenwechsel','${e.id}')" title="Löschen">✕</button>
+          </div>
         </div>`).join('')||'<div class="empty-list">Noch keine Reifenwechsel.</div>'
     )}
     ${section(v,'reinigungen','🧹 Reinigung & Desinfektion',
@@ -706,7 +724,10 @@ function renderDetail(id){
             <div class="emeta">${e.durchgefuehrt?`<span>👤 ${e.durchgefuehrt}</span>`:''}</div>
             ${e.notiz?`<div class="enote">${e.notiz}</div>`:''}
           </div>
-          <button class="edel" onclick="delEntry('${v.id}','reinigungen','${e.id}')" title="Löschen">✕</button>
+          <div class="erow-actions">
+            <button class="edel eedit" onclick="editEntry('${v.id}','reinigungen','${e.id}')" title="Bearbeiten">✎</button>
+            <button class="edel" onclick="delEntry('${v.id}','reinigungen','${e.id}')" title="Löschen">✕</button>
+          </div>
         </div>`).join('')||'<div class="empty-list">Noch keine Reinigungseinträge.</div>'
     )}
     ${section(v,'unfaelle','⚠️ Unfalldokumentation',
@@ -726,7 +747,10 @@ function renderDetail(id){
               :'<div class="foto-count" style="color:var(--text-soft)">Keine Fotos hochgeladen</div>'
             }
           </div>
-          <button class="edel" onclick="delEntry('${v.id}','unfaelle','${e.id}')" title="Löschen">✕</button>
+          <div class="erow-actions">
+            <button class="edel eedit" onclick="editEntry('${v.id}','unfaelle','${e.id}')" title="Bearbeiten">✎</button>
+            <button class="edel" onclick="delEntry('${v.id}','unfaelle','${e.id}')" title="Löschen">✕</button>
+          </div>
         </div>`).join('')||'<div class="empty-list">Keine Unfälle dokumentiert.</div>'
     )}
   `;
@@ -849,83 +873,86 @@ async function delEntry(vid,type,eid){
 }
 
 // ── MODALS ────────────────────────────────────────────────────────────────────
-function openModal(vid,type){
-  const titles={wartungen:'Wartung eintragen',reifenwechsel:'Reifenwechsel eintragen',reinigungen:'Reinigung / Desinfektion eintragen',unfaelle:'Unfall eintragen'};
+function escAttr(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+function selOpt(val,current){return String(val)===String(current)?' selected':'';}
+
+function editEntry(vid,type,eid){openModal(vid,type,eid);}
+
+function openModal(vid,type,eid=null){
+  const v=data.find(x=>x.id===vid);
+  const entry=eid?(v[type]||[]).find(e=>e.id===eid):null;
+  const titlesNew={wartungen:'Wartung eintragen',reifenwechsel:'Reifenwechsel eintragen',reinigungen:'Reinigung / Desinfektion eintragen',unfaelle:'Unfall eintragen'};
+  const titlesEdit={wartungen:'Wartung bearbeiten',reifenwechsel:'Reifenwechsel bearbeiten',reinigungen:'Reinigung / Desinfektion bearbeiten',unfaelle:'Unfall bearbeiten'};
+  const titles=entry?titlesEdit:titlesNew;
+  const existingDocs=(entry?.dokumente||[]);
+  const existingFotos=(entry?.fotos||[]);
   const forms={
     wartungen:`
-      <div class="mfield"><label>Datum *</label><input type="date" id="m_dat" value="${today()}"/></div>
-      <div class="mfield"><label>Art der Wartung *</label><input id="m_art" placeholder="z.B. Hauptuntersuchung (TÜV), Ölwechsel, Bremsen …"/></div>
+      <div class="mfield"><label>Datum *</label><input type="date" id="m_dat" value="${entry?.datum||today()}"/></div>
+      <div class="mfield"><label>Art der Wartung *</label><input id="m_art" value="${escAttr(entry?.art)}" placeholder="z.B. Hauptuntersuchung (TÜV), Ölwechsel, Bremsen …"/></div>
       <div class="mrow">
-        <div class="mfield"><label>Kilometerstand</label><input type="number" id="m_km" placeholder="km"/></div>
-        <div class="mfield"><label>Kosten (€)</label><input type="number" id="m_kos" placeholder="€"/></div>
+        <div class="mfield"><label>Kilometerstand</label><input type="number" id="m_km" value="${entry?.km||''}" placeholder="km"/></div>
+        <div class="mfield"><label>Kosten (€)</label><input type="number" id="m_kos" value="${entry?.kosten||''}" placeholder="€"/></div>
       </div>
-      <div class="mfield"><label>Werkstatt / Prüfstelle</label><input id="m_wrk" placeholder="Name der Werkstatt oder TÜV-Stelle"/></div>
-      <div class="mfield"><label>Notiz</label><textarea id="m_not" rows="2"></textarea></div>
+      <div class="mfield"><label>Werkstatt / Prüfstelle</label><input id="m_wrk" value="${escAttr(entry?.werkstatt)}" placeholder="Name der Werkstatt oder TÜV-Stelle"/></div>
+      <div class="mfield"><label>Notiz</label><textarea id="m_not" rows="2">${escAttr(entry?.notiz)}</textarea></div>
       <div class="mfield">
         <label>Dokumente anhängen (TÜV-Bericht, Rechnung)</label>
+        ${existingDocs.length?`<div class="dok-badges">${existingDocs.map(d=>`<span class="dok-badge">📎 ${d.name}</span>`).join('')}</div><div class="foto-hinweis">Vorhandene Dokumente bleiben erhalten. Neue Auswahl ergänzt weitere.</div>`:''}
         <input type="file" id="m_docs" accept="image/*,.pdf" multiple onchange="previewDokumente()"/>
         <div class="foto-hinweis">JPG / PNG werden komprimiert · PDF direkt gespeichert · max. 3 Dateien</div>
         <div class="foto-preview" id="dokPreview"></div>
       </div>`,
     reifenwechsel:`
-      <div class="mfield"><label>Datum *</label><input type="date" id="m_dat" value="${today()}"/></div>
+      <div class="mfield"><label>Datum *</label><input type="date" id="m_dat" value="${entry?.datum||today()}"/></div>
       <div class="mfield"><label>Wechsel</label>
-        <select id="m_von"><option>Sommer → Winter</option><option>Winter → Sommer</option><option>Komplettwechsel (neu)</option><option>Ganzjahresreifen montiert</option></select>
+        <select id="m_von">${['Sommer → Winter','Winter → Sommer','Komplettwechsel (neu)','Ganzjahresreifen montiert'].map(o=>`<option${selOpt(o,entry?.vonBis)}>${o}</option>`).join('')}</select>
       </div>
-      <div class="mfield"><label>Reifenbezeichnung</label><input id="m_rei" placeholder="z.B. Continental WinterContact TS 870"/></div>
+      <div class="mfield"><label>Reifenbezeichnung</label><input id="m_rei" value="${escAttr(entry?.reifen)}" placeholder="z.B. Continental WinterContact TS 870"/></div>
       <div class="mrow">
-        <div class="mfield"><label>Profiltiefe</label><input id="m_pro" placeholder="z.B. 7.5 mm"/></div>
-        <div class="mfield"><label>Kilometerstand</label><input type="number" id="m_km" placeholder="km"/></div>
+        <div class="mfield"><label>Profiltiefe</label><input id="m_pro" value="${escAttr(entry?.profiltiefe)}" placeholder="z.B. 7.5 mm"/></div>
+        <div class="mfield"><label>Kilometerstand</label><input type="number" id="m_km" value="${entry?.km||''}" placeholder="km"/></div>
       </div>
-      <div class="mfield"><label>Notiz</label><textarea id="m_not" rows="2"></textarea></div>`,
+      <div class="mfield"><label>Notiz</label><textarea id="m_not" rows="2">${escAttr(entry?.notiz)}</textarea></div>`,
     reinigungen:`
-      <div class="mfield"><label>Datum *</label><input type="date" id="m_dat" value="${today()}"/></div>
+      <div class="mfield"><label>Datum *</label><input type="date" id="m_dat" value="${entry?.datum||today()}"/></div>
       <div class="mfield"><label>Art der Reinigung / Desinfektion *</label>
         <select id="m_art">
-          <option>Desinfektion Innenraum</option>
-          <option>Desinfektion Innenraum + Lenkrad</option>
-          <option>Desinfektion Innenraum + Sitzpolster</option>
-          <option>Desinfektion Innenraum + Ladefläche</option>
-          <option>Außenreinigung</option>
-          <option>Innenreinigung</option>
-          <option>Außen- und Innenreinigung</option>
-          <option>Außen- und Innenreinigung + Desinfektion</option>
-          <option>Vollreinigung innen + außen + Desinfektion</option>
-          <option>Handwäsche + Innenreinigung</option>
-          <option>Sonstiges</option>
+          ${['Desinfektion Innenraum','Desinfektion Innenraum + Lenkrad','Desinfektion Innenraum + Sitzpolster','Desinfektion Innenraum + Ladefläche','Außenreinigung','Innenreinigung','Außen- und Innenreinigung','Außen- und Innenreinigung + Desinfektion','Vollreinigung innen + außen + Desinfektion','Handwäsche + Innenreinigung','Sonstiges'].map(o=>`<option${selOpt(o,entry?.art)}>${o}</option>`).join('')}
         </select>
       </div>
-      <div class="mfield"><label>Durchgeführt von</label><input id="m_dur" placeholder="Name / Büro / Reinigungsdienst"/></div>
-      <div class="mfield"><label>Notiz</label><textarea id="m_not" rows="2"></textarea></div>`,
+      <div class="mfield"><label>Durchgeführt von</label><input id="m_dur" value="${escAttr(entry?.durchgefuehrt)}" placeholder="Name / Büro / Reinigungsdienst"/></div>
+      <div class="mfield"><label>Notiz</label><textarea id="m_not" rows="2">${escAttr(entry?.notiz)}</textarea></div>`,
     unfaelle:`
-      <div class="mfield"><label>Datum *</label><input type="date" id="m_dat" value="${today()}"/></div>
-      <div class="mfield"><label>Beschreibung *</label><textarea id="m_bes" rows="2" placeholder="Was ist passiert? Ort, Schaden, Hergang …"></textarea></div>
+      <div class="mfield"><label>Datum *</label><input type="date" id="m_dat" value="${entry?.datum||today()}"/></div>
+      <div class="mfield"><label>Beschreibung *</label><textarea id="m_bes" rows="2" placeholder="Was ist passiert? Ort, Schaden, Hergang …">${escAttr(entry?.beschreibung)}</textarea></div>
       <div class="mrow">
-        <div class="mfield"><label>Schadenshöhe (€)</label><input type="number" id="m_sch" placeholder="ca."/></div>
+        <div class="mfield"><label>Schadenshöhe (€)</label><input type="number" id="m_sch" value="${entry?.schaden||''}" placeholder="ca."/></div>
         <div class="mfield"><label>Status</label>
-          <select id="m_sta"><option value="1">Repariert / abgeschlossen</option><option value="0">Noch offen</option></select>
+          <select id="m_sta"><option value="1"${selOpt(1,entry?entry.repariert?1:0:1)}>Repariert / abgeschlossen</option><option value="0"${selOpt(0,entry?entry.repariert?1:0:1)}>Noch offen</option></select>
         </div>
       </div>
       <div class="mrow">
         <div class="mfield"><label>Verschulden</label>
-          <select id="m_fre"><option value="0">Eigenverschulden</option><option value="1">Fremdverschulden</option></select>
+          <select id="m_fre"><option value="0"${selOpt(0,entry?.fremdverschulden?1:0)}>Eigenverschulden</option><option value="1"${selOpt(1,entry?.fremdverschulden?1:0)}>Fremdverschulden</option></select>
         </div>
         <div class="mfield"><label>Versicherungsfall</label>
-          <select id="m_ver"><option value="0">Nein</option><option value="1">Ja</option></select>
+          <select id="m_ver"><option value="0"${selOpt(0,entry?.versicherungsfall?1:0)}>Nein</option><option value="1"${selOpt(1,entry?.versicherungsfall?1:0)}>Ja</option></select>
         </div>
       </div>
       <div class="mfield"><label>Fotos (max. 5)</label>
+        ${existingFotos.length?`<div class="foto-preview">${existingFotos.map(f=>`<img src="${f.url||f.dataUrl||''}" title="${escAttr(f.name)}"/>`).join('')}</div><div class="foto-hinweis">Vorhandene Fotos bleiben erhalten. Neue Auswahl ergänzt weitere.</div>`:''}
         <input type="file" id="m_fotos" accept="image/*" multiple onchange="previewFotos()"/>
         <div class="foto-hinweis">JPG / PNG · werden auf 900 px verkleinert und in der Cloud gespeichert</div>
         <div class="foto-preview" id="fotoPreview"></div>
       </div>
-      <div class="mfield"><label>Notiz</label><textarea id="m_not" rows="2"></textarea></div>`
+      <div class="mfield"><label>Notiz</label><textarea id="m_not" rows="2">${escAttr(entry?.notiz)}</textarea></div>`
   };
   document.getElementById('modalBox').innerHTML=`
     <h2>${titles[type]}</h2>${forms[type]}
     <div class="modal-btns">
       <button class="btn-modal-cancel" onclick="closeModal()">Abbrechen</button>
-      <button class="btn-modal-ok" onclick="saveEntry('${vid}','${type}')">Speichern</button>
+      <button class="btn-modal-ok" onclick="saveEntry('${vid}','${type}'${eid?`,'${eid}'`:''})">Speichern</button>
     </div>`;
   document.getElementById('modalWrap').style.display='block';
 }
@@ -1006,12 +1033,69 @@ function viewFoto(vid,eid,fi){
   document.getElementById('modalWrap').style.display='block';
 }
 
+// ── TÜV-DOKUMENTE (direkt am TÜV-Termin) ──────────────────────────────────────
+async function uploadTuevDoc(vid,ev){
+  const files=Array.from(ev.target.files||[]).slice(0,5);
+  if(!files.length) return;
+  const v=data.find(x=>x.id===vid);
+  const hint=document.getElementById('tuevUploadHint_'+vid);
+  if(hint) hint.style.display='block';
+  showToast('TÜV-Bericht wird hochgeladen …');
+  try{
+    const neu=await Promise.all(files.map((f,i)=>{
+      const safe=f.name.replace(/[^a-z0-9._-]/gi,'_');
+      const base=`tuev/${vid}/${uid()}_${i}_${safe}`;
+      return f.type.startsWith('image/')?resizeAndUpload(f,base):uploadDoc(f,base);
+    }));
+    v.tuevDokumente=[...(v.tuevDokumente||[]),...neu];
+    const ok=await saveVehicle(v);
+    if(ok){renderDetail(vid);showToast('TÜV-Bericht gespeichert.','ok-toast');}
+  }catch(err){
+    showToast('Upload fehlgeschlagen: '+err.message,'err-toast');
+  }finally{
+    if(hint) hint.style.display='none';
+    ev.target.value='';
+  }
+}
+
+function viewTuevDokument(vid,idx){
+  const v=data.find(x=>x.id===vid);
+  const dok=v?.tuevDokumente?.[idx];
+  if(!dok) return;
+  const src=dok.url||dok.dataUrl||'';
+  document.getElementById('modalBox').innerHTML=`
+    <h2>📎 ${dok.name}</h2>
+    ${dok.isPdf
+      ?`<div style="padding:20px;text-align:center;background:var(--bg);border-radius:8px;margin-top:8px"><div style="font-size:.85rem;color:var(--text-soft);margin-bottom:12px">PDF öffnen oder herunterladen</div><a href="${src}" target="_blank" rel="noopener" style="background:var(--kth-blue);color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:700">⬇ PDF öffnen</a></div>`
+      :`<img class="lightbox-img" src="${src}"/>`}
+    <div class="modal-btns">
+      <a href="${src}" download="${dok.name}" class="btn-modal-cancel">⬇ Herunterladen</a>
+      <button class="btn-modal-cancel" style="border-color:var(--danger-border);color:var(--danger)" onclick="delTuevDokument('${vid}',${idx})">🗑 Löschen</button>
+      <button class="btn-modal-cancel" onclick="closeModal()">Schließen</button>
+    </div>`;
+  document.getElementById('modalWrap').style.display='block';
+}
+
+async function delTuevDokument(vid,idx){
+  if(!confirm('Diesen TÜV-Bericht löschen?')) return;
+  const v=data.find(x=>x.id===vid);
+  const dok=v.tuevDokumente[idx];
+  if(dok?.path) await removeStoragePaths([dok.path]);
+  v.tuevDokumente=v.tuevDokumente.filter((_,i)=>i!==idx);
+  if(await saveVehicle(v)){
+    document.getElementById('modalWrap').style.display='none';
+    renderDetail(vid);
+    showToast('TÜV-Bericht gelöscht.');
+  }
+}
+
 // ── EINTRAG SPEICHERN ─────────────────────────────────────────────────────────
-async function saveEntry(vid,type){
+async function saveEntry(vid,type,editId=null){
   const dat=document.getElementById('m_dat')?.value;
   if(!dat){showToast('Bitte Datum angeben.','err-toast');return;}
   const v=data.find(x=>x.id===vid);
-  const eid=uid();
+  const existing=editId?v[type].find(x=>x.id===editId):null;
+  const eid=editId||uid();
   let e={id:eid,datum:dat};
 
   if(type==='wartungen'){
@@ -1019,14 +1103,15 @@ async function saveEntry(vid,type){
     if(!art){showToast('Bitte Art der Wartung angeben.','err-toast');return;}
     const fileInput=document.getElementById('m_docs');
     const docFiles=fileInput?Array.from(fileInput.files).slice(0,3):[];
-    let dokumente=[];
+    let dokumente=existing?.dokumente||[];
     if(docFiles.length>0){
       showToast('Dokumente werden hochgeladen …');
-      dokumente=await Promise.all(docFiles.map(f=>{
+      const neu=await Promise.all(docFiles.map(f=>{
         const safe=f.name.replace(/[^a-z0-9._-]/gi,'_');
-        const base=`wartungen/${vid}/${eid}/${safe}`;
+        const base=`wartungen/${vid}/${eid}/${uid()}_${safe}`;
         return f.type.startsWith('image/')?resizeAndUpload(f,base):uploadDoc(f,base);
       }));
+      dokumente=[...dokumente,...neu];
     }
     e={...e,art,km:parseInt(document.getElementById('m_km')?.value)||0,kosten:parseFloat(document.getElementById('m_kos')?.value)||0,werkstatt:document.getElementById('m_wrk')?.value.trim()||'',notiz:document.getElementById('m_not')?.value.trim()||'',dokumente};
   } else if(type==='reifenwechsel'){
@@ -1038,27 +1123,34 @@ async function saveEntry(vid,type){
     if(!bes){showToast('Bitte Beschreibung angeben.','err-toast');return;}
     const fileInput=document.getElementById('m_fotos');
     const files=fileInput?Array.from(fileInput.files).slice(0,5):[];
-    let fotos=[];
+    let fotos=existing?.fotos||[];
     if(files.length>0){
       showToast('Fotos werden hochgeladen …');
-      fotos=await Promise.all(files.map((f,i)=>{
+      const neu=await Promise.all(files.map((f,i)=>{
         const safe=f.name.replace(/[^a-z0-9._-]/gi,'_');
-        const base=`unfaelle/${vid}/${eid}/${i}_${safe}`;
+        const base=`unfaelle/${vid}/${eid}/${uid()}_${i}_${safe}`;
         return resizeAndUpload(f,base);
       }));
+      fotos=[...fotos,...neu];
     }
     e={...e,beschreibung:bes,schaden:parseFloat(document.getElementById('m_sch')?.value)||0,repariert:document.getElementById('m_sta')?.value==='1',fremdverschulden:document.getElementById('m_fre')?.value==='1',versicherungsfall:document.getElementById('m_ver')?.value==='1',notiz:document.getElementById('m_not')?.value.trim()||'',fotos};
   }
 
-  v[type].push(e);
+  const backup=[...v[type]];
+  if(existing){
+    const idx=v[type].findIndex(x=>x.id===editId);
+    v[type][idx]=e;
+  } else {
+    v[type].push(e);
+  }
   showToast('Wird gespeichert …');
   const ok=await saveVehicle(v);
   if(ok){
     document.getElementById('modalWrap').style.display='none';
     renderDetail(vid);
-    showToast('Eintrag gespeichert.','ok-toast');
+    showToast(existing?'Eintrag aktualisiert.':'Eintrag gespeichert.','ok-toast');
   } else {
-    v[type].pop();
+    v[type]=backup;
   }
 }
 
